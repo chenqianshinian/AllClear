@@ -651,9 +651,10 @@ struct RemoveWatermarkView: View {
         }
 
         if activeKind == .image {
-            // 后端 /remove-image-watermark 当前固定扣 1 次/张，use_ai 不额外计费；
-            // 这里必须与后端保持一致，否则确认弹窗承诺的扣费次数是错的。
-            let cost = images.count
+            // 与鸿蒙端 / iOS 端既有文案保持一致：AI 超强去水印 5 次/张，常规 1 次/张。
+            // ⚠️ 后端 /remove-image-watermark 目前写死 cost = 1，use_ai 不额外计费，
+            //    需要后端同步改成 `cost = 5 if use_ai else 1`，否则「说扣 5 实扣 1」。
+            let cost = images.count * (useAI ? 5 : 1)
             guard session.points >= cost else {
                 Toast.shared.show("剩余 \(session.points) 次，本次需要 \(cost) 次，请先获取额度", duration: 3)
                 return

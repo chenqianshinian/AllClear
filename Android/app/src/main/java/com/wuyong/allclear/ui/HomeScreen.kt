@@ -179,7 +179,7 @@ fun HomeScreen(vm: MainViewModel) {
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text("启用 AI 超强去水印", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AcColor.Title)
-                                Text("每张消耗 1 次额度，效果更佳", fontSize = 11.sp, color = AcColor.Secondary)
+                                Text("每张消耗 5 次额度，效果更佳", fontSize = 11.sp, color = AcColor.Secondary)
                             }
                             Switch(checked = useAi, onCheckedChange = { useAi = it })
                         }

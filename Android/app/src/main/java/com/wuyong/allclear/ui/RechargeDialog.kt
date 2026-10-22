@@ -48,7 +48,13 @@ private val packages = listOf(
 fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selected by remember { mutableIntStateOf(1) }
+    // 与鸿蒙端一致：已经是会员时只展示「急救包」，不再重复售卖会员档位
+    val availablePackages = remember(vm.isVip) {
+        if (vm.isVip) packages.filter { it.id == "pack_10" } else packages
+    }
+    var selected by remember(availablePackages) {
+        mutableIntStateOf(if (availablePackages.size > 1) 1 else 0)
+    }
     var method by remember { mutableStateOf("alipay") }
     var order by remember { mutableStateOf<ApiClient.Order?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -91,7 +97,7 @@ fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
             ) {
-                packages.forEachIndexed { index, pkg ->
+                availablePackages.forEachIndexed { index, pkg ->
                     val isSelected = index == selected
                     Row(
                         modifier = Modifier
@@ -129,7 +135,6 @@ fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
 
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // 切换支付方式必须作废已生成的订单，否则二维码仍是旧渠道的，用户会扫错
                     FilterChip(
                         selected = method == "alipay",
                         onClick = { if (!loading) { method = "alipay"; error = ""; order = null } },
@@ -158,7 +163,7 @@ fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
                         scope.launch {
                             val result = runCatching {
                                 withContext(Dispatchers.IO) {
-                                    ApiClient.createOrder(packages[selected].id, method)
+                                    ApiClient.createOrder(availablePackages[selected].id, method)
                                 }
                             }
                             loading = false
@@ -173,7 +178,7 @@ fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
                     if (loading) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                     } else {
-                        Text("确认支付 ${packages[selected].price}")
+                        Text("确认支付 ${availablePackages[selected].price}")
                     }
                 }
             } else {
