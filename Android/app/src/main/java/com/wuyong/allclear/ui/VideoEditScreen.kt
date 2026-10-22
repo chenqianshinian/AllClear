@@ -97,7 +97,7 @@ fun VideoEditScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ACColor.PageBg)
+            .background(AcColor.PageBg)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
     ) {
@@ -109,13 +109,13 @@ fun VideoEditScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButtonLike(onClick = { if (!vm.isProcessing) onExit() }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = ACColor.Title)
+                Icon(Icons.Default.ArrowBack, contentDescription = "返回", tint = AcColor.Title)
             }
             Text(
                 if (resultUrl == null) "框选视频水印" else "处理完成",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = ACColor.Title,
+                color = AcColor.Title,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -124,7 +124,7 @@ fun VideoEditScreen(
             if (resultUrl == null) "在视频画面上按住拖出方框，框住水印位置；点方框可删除"
             else "预览效果满意后保存到相册",
             fontSize = 13.sp,
-            color = ACColor.Secondary,
+            color = AcColor.Secondary,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
         )
 
@@ -194,12 +194,12 @@ fun VideoEditScreen(
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         boxes.forEach { rect ->
                             drawRect(
-                                color = ACColor.TabActive.copy(alpha = 0.22f),
+                                color = AcColor.TabActive.copy(alpha = 0.22f),
                                 topLeft = rect.topLeft,
                                 size = rect.size
                             )
                             drawRect(
-                                color = ACColor.TabActive,
+                                color = AcColor.TabActive,
                                 topLeft = rect.topLeft,
                                 size = rect.size,
                                 style = Stroke(width = 3f)
@@ -207,12 +207,12 @@ fun VideoEditScreen(
                         }
                         drawing?.let { rect ->
                             drawRect(
-                                color = ACColor.TabActive.copy(alpha = 0.12f),
+                                color = AcColor.TabActive.copy(alpha = 0.12f),
                                 topLeft = rect.topLeft,
                                 size = rect.size
                             )
                             drawRect(
-                                color = ACColor.TabActive,
+                                color = AcColor.TabActive,
                                 topLeft = rect.topLeft,
                                 size = rect.size,
                                 style = Stroke(width = 2f)
@@ -237,7 +237,7 @@ fun VideoEditScreen(
                         .clip(RoundedCornerShape(3.dp))
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(vm.stageText, fontSize = 12.sp, color = ACColor.Secondary)
+                Text(vm.stageText, fontSize = 12.sp, color = AcColor.Secondary)
             }
         }
 
@@ -310,7 +310,7 @@ fun VideoEditScreen(
                 Text(
                     "框选不满意？登录 AllClear 官网可以在电脑上做更精准的批量框选。",
                     fontSize = 12.sp,
-                    color = ACColor.Secondary,
+                    color = AcColor.Secondary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -346,7 +346,7 @@ fun VideoEditScreen(
                                 withContext(Dispatchers.IO) {
                                     val name = withSuffix(file.name)
                                     val local = MediaSaver.download(context, url, name)
-                                    MediaSaver.saveToAlbum(context, local, isVideo = true)
+                                    MediaSaver.saveToGallery(context, local, true)
                                 }
                             }
                             isSaving = false
