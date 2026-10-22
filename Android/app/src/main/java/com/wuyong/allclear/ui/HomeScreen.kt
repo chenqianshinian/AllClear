@@ -290,6 +290,52 @@ fun HomeScreen(vm: MainViewModel) {
             )
         }
 
+        // 与鸿蒙端一致：文档处理结果不满意时，可输入水印文字再擦除一次
+        if (vm.mode == 1 && vm.results.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED))
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "处理结果不满意？",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF9A3412)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "如果部分顽固水印未能自动去除，输入水印文字可以再擦除一次（每次消耗 1 次额度）",
+                        fontSize = 12.sp,
+                        color = Color(0xFFC2410C),
+                        lineHeight = 18.sp
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = docPrompt,
+                            onValueChange = { docPrompt = it },
+                            placeholder = { Text("例如：绝密资料") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Button(
+                            onClick = { vm.process(prompt = docPrompt.trim()) },
+                            enabled = !vm.isProcessing && docPrompt.isNotBlank(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("重试")
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
     }
 }

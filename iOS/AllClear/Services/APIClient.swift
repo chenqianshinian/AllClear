@@ -171,6 +171,18 @@ final class APIClient {
         return try decode(data, as: CheckinResponse.self)
     }
 
+    /// DELETE /users/me —— 账号注销（与 Android 端一致，应用市场硬性要求）
+    func deleteAccount() async throws {
+        var request = try authorizedRequest("users/me")
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 30
+        let (data, response) = try await perform(request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.emptyResponse }
+        guard http.statusCode == 200 || http.statusCode == 204 else {
+            throw APIError.from(status: http.statusCode, data: data)
+        }
+    }
+
     /// 扫码登录电脑版确认（与鸿蒙端一致）
     func confirmScanLogin(sceneId: String) async throws {
         _ = try await sendJSON("auth/scan/confirm", method: "POST", body: ["scene_id": sceneId])

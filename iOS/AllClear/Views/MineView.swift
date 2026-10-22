@@ -13,6 +13,8 @@ struct MineView: View {
     @State private var showShare = false
     @State private var showTutorial = false
     @State private var shareItems: [Any] = []
+    @State private var showDeleteAccount = false
+    @State private var isDeletingAccount = false
 
     @State private var avatarItem: PhotosPickerItem?
     @State private var nickname = ""
@@ -97,6 +99,14 @@ struct MineView: View {
         }
         .fullScreenCover(isPresented: $showScanner) {
             ScanLoginView()
+        }
+        .alert("确认注销账号？", isPresented: $showDeleteAccount) {
+            Button("取消", role: .cancel) {}
+            Button("永久注销", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+        } message: {
+            Text("注销后，账号、剩余次数、会员权益与处理记录将被永久删除且无法恢复，已购买的额度不予退还。")
         }
         .onChange(of: avatarItem) { _, item in
             guard let item else { return }
@@ -288,8 +298,14 @@ struct MineView: View {
                 shareInvite()
             }
 
-            ACMenuRow(icon: "📞", title: "联系客服", showDivider: false) {
+            ACMenuRow(icon: "📞", title: "联系客服", showDivider: session.isLogin) {
                 copyCustomerService()
+            }
+
+            if session.isLogin {
+                ACMenuRow(icon: "🗑️", title: "注销账号", showDivider: false, destructive: true) {
+                    showDeleteAccount = true
+                }
             }
         }
         .background(Color.white)
@@ -316,6 +332,25 @@ struct MineView: View {
     }
 
     // MARK: - 交互
+
+    @MainActor
+    private func deleteAccount() async {
+        guard !isDeletingAccount else { return }
+        isDeletingAccount = true
+        LoadingCenter.shared.show("正在注销...")
+        defer {
+            LoadingCenter.shared.hide()
+            isDeletingAccount = false
+        }
+        do {
+            try await session.deleteAccount()
+            nickname = ""
+            Toast.shared.success("账号已注销")
+        } catch {
+            let message = (error as? APIError)?.errorDescription ?? "注销失败，请稍后重试"
+            Toast.shared.show(message, duration: 3)
+        }
+    }
 
     private func syncNickname() {
         nickname = session.user?.nickname ?? ""

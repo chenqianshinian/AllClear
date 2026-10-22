@@ -401,6 +401,7 @@ struct ACMenuRow: View {
     let icon: String
     let title: String
     var showDivider: Bool = true
+    var destructive: Bool = false
     var action: () -> Void
 
     var body: some View {
@@ -411,7 +412,7 @@ struct ACMenuRow: View {
                         .font(.system(size: 20))
                     Text(title)
                         .font(.system(size: 16))
-                        .foregroundStyle(ACColor.gray700)
+                        .foregroundStyle(destructive ? ACColor.red500 : ACColor.gray700)
                     Spacer()
                     Text("›")
                         .font(.system(size: 20))

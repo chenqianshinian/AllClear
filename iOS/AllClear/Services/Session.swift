@@ -112,6 +112,12 @@ final class Session: ObservableObject {
         return result
     }
 
+    /// 账号注销：服务端删除成功后立即清空本地登录态
+    func deleteAccount() async throws {
+        try await APIClient.shared.deleteAccount()
+        logout()
+    }
+
     func logout() {
         isLogin = false
         user = nil
