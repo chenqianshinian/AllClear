@@ -49,11 +49,11 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 ## 界面
 
 <p align="center">
-  <img src="docs/screenshots/ios-home.png" width="230" alt="首页">
   <img src="docs/screenshots/splash.jpg" width="230" alt="启动页">
+  <img src="docs/screenshots/home.png" width="230" alt="首页">
 </p>
 
-<p align="center"><sub>iOS 版实机截图（Android 版界面语言一致）</sub></p>
+<p align="center"><sub>鸿蒙端上架实机截图（Android / iOS 版界面语言一致）</sub></p>
 
 ## 已上架
 
