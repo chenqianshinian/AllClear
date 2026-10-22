@@ -59,6 +59,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var video by mutableStateOf<PickedFile?>(null)
         private set
 
+    /** 视频框选页正在编辑的视频；非 null 时主界面切换到框选页 */
+    var editingVideo by mutableStateOf<PickedFile?>(null)
+        private set
+
     var isProcessing by mutableStateOf(false)
         private set
     var progress by mutableStateOf(0)
@@ -155,7 +159,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             images.clear()
             video?.file?.delete()
             video = item
+            // 选完视频直接进入框选页（与鸿蒙端 pages/video-edit 一致）
+            editingVideo = item
             clearResult()
+        }
+    }
+
+    fun closeVideoEditor() {
+        editingVideo = null
+    }
+
+    /** 框选页提交：regionsJson 形如 [{"x":0,"y":0,"width":100,"height":40}] */
+    fun processVideoRegions(regionsJson: String, onDone: (Boolean) -> Unit) {
+        val item = editingVideo ?: return
+        if (!isLogin) {
+            showToast("请先登录")
+            onDone(false)
+            return
+        }
+        if (points <= 0) {
+            showToast("次数不足！处理 1 个视频需要 1 次，请前往“我的”页面获取")
+            onDone(false)
+            return
+        }
+        viewModelScope.launch {
+            isProcessing = true
+            progress = 0
+            stageText = "正在上传并处理视频…"
+            val outcome = runCatching {
+                withContext(Dispatchers.IO) {
+                    ApiClient.removeMedia(
+                        file = item.file,
+                        isVideo = true,
+                        regions = regionsJson,
+                        onProgress = { p -> progress = p }
+                    )
+                }
+            }
+            isProcessing = false
+            stageText = ""
+            outcome.onSuccess { url ->
+                progress = 100
+                results.clear()
+                results.add(ResultFile(remoteUrl = url, name = item.name, kind = FileKind.VIDEO))
+                showToast("处理完成")
+                refreshUser()
+                onDone(true)
+            }.onFailure {
+                showToast(it.message ?: "处理失败，请稍后重试")
+                onDone(false)
+            }
         }
     }
 
@@ -337,6 +390,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ApiClient.logout(context)
         isLogin = false
         user = null
+    }
+
+    /** 扫码登录电脑版：把扫码得到的 sceneId 提交给后端确认 */
+    fun confirmScanLogin(sceneId: String, onDone: (Boolean, String) -> Unit) {
+        if (!isLogin) {
+            onDone(false, "请先登录")
+            return
+        }
+        if (sceneId.isBlank()) {
+            onDone(false, "无效的登录二维码")
+            return
+        }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { ApiClient.confirmScanLogin(sceneId) } }
+                .onSuccess { onDone(true, "电脑端已成功登录") }
+                .onFailure { onDone(false, it.message ?: "二维码已过期或无效") }
+        }
     }
 
     // ---------- 首启隐私合规 ----------

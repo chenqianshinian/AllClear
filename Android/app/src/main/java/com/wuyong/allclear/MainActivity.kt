@@ -35,6 +35,7 @@ import com.wuyong.allclear.ui.MainViewModel
 import com.wuyong.allclear.ui.MineScreen
 import com.wuyong.allclear.ui.PrivacyConsentDialog
 import com.wuyong.allclear.ui.ToastHost
+import com.wuyong.allclear.ui.VideoEditScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -76,6 +77,14 @@ private fun AllClearApp() {
             },
             onExit = { (context as? android.app.Activity)?.finish() }
         )
+        return
+    }
+
+    // 选完视频后进入框选页（与鸿蒙端 pages/video-edit 一致）
+    val editing = vm.editingVideo
+    if (editing != null) {
+        VideoEditScreen(vm = vm, file = editing, onExit = { vm.closeVideoEditor() })
+        ToastHost(vm)
         return
     }
 

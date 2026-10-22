@@ -25,6 +25,7 @@ object Api {
     const val ORDER_CREATE = "$BASE/orders/create"
     const val ORDER_STATUS = "$BASE/orders/status"
     const val AVATAR = "$BASE/users/avatar"
+    const val SCAN_CONFIRM = "$BASE/auth/scan/confirm"
 
     /** 后端可能返回 /static/xxx 相对路径 */
     fun absolute(url: String): String = when {

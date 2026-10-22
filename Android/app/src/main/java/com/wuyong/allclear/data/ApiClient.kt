@@ -135,6 +135,18 @@ object ApiClient {
         }
     }
 
+    /** 扫码登录电脑版：确认 sceneId */
+    fun confirmScanLogin(sceneId: String) {
+        val json = JSONObject().put("scene_id", sceneId).toString()
+        val request = authorized(Api.SCAN_CONFIRM)
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+        client.newCall(request).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw ApiException(errorMessage(body, resp.code), resp.code)
+        }
+    }
+
     /** 审核模式：为 true 时隐藏充值入口；请求失败返回 null（保持调用方现有状态） */
     fun inReview(): Boolean? {
         val request = Request.Builder().url(Api.SYSTEM_CONFIG).get().build()
@@ -168,13 +180,15 @@ object ApiClient {
         isVideo: Boolean,
         useAi: Boolean = false,
         prompt: String? = null,
+        /** 视频框选区域，JSON 数组字符串，默认空数组 */
+        regions: String = "[]",
         onProgress: ((Int) -> Unit)? = null
     ): String {
         val url = if (isVideo) Api.REMOVE_VIDEO else Api.REMOVE_IMAGE
         val fileBody = FileProgressBody(file, "application/octet-stream".toMediaType(), onProgress)
         val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", file.name, fileBody)
-            .addFormDataPart("regions", "[]")
+            .addFormDataPart("regions", regions)
             .addFormDataPart("client", "miniprogram")
         if (!isVideo) {
             builder.addFormDataPart("use_ai", if (useAi) "true" else "false")

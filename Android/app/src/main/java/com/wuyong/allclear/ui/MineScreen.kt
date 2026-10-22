@@ -1,9 +1,13 @@
-﻿package com.wuyong.allclear.ui
+package com.wuyong.allclear.ui
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,7 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.wuyong.allclear.data.Api
 import com.wuyong.allclear.data.UserInfo
 
@@ -39,6 +46,36 @@ fun MineScreen(vm: MainViewModel, onNavigateRemove: () -> Unit) {
     var agreed by remember { mutableStateOf(true) }
     var isCheckingIn by remember { mutableStateOf(false) }
     var showDeleteAccount by remember { mutableStateOf(false) }
+
+    // 扫码登录电脑版
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val raw = result.contents
+        if (!raw.isNullOrBlank()) {
+            val prefix = "allclear_login:"
+            if (raw.startsWith(prefix)) {
+                vm.confirmScanLogin(raw.removePrefix(prefix).trim()) { _, message -> vm.showToast(message) }
+            } else {
+                vm.showToast("无效的登录二维码")
+            }
+        }
+    }
+
+    val launchScanner: () -> Unit = {
+        scanLauncher.launch(
+            ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("将电脑端二维码放入框内")
+                setBeepEnabled(false)
+                setOrientationLocked(true)
+            }
+        )
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) launchScanner() else vm.showToast("需要相机权限才能扫码登录")
+    }
 
     LaunchedEffect(Unit) {
         vm.refreshUser()
@@ -113,7 +150,18 @@ fun MineScreen(vm: MainViewModel, onNavigateRemove: () -> Unit) {
                     showRecharge = true
                 },
                 onSupport = { showSupport = true },
-                onDeleteAccount = { showDeleteAccount = true }
+                onDeleteAccount = { showDeleteAccount = true },
+                onScanLogin = {
+                    if (!vm.isLogin) {
+                        vm.showToast("请先登录")
+                        return@MenuCard
+                    }
+                    val granted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (granted) launchScanner() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
             )
             Spacer(Modifier.height(20.dp))
             Text(
@@ -311,7 +359,8 @@ private fun MenuCard(
     onInvite: () -> Unit,
     onRecharge: () -> Unit,
     onSupport: () -> Unit,
-    onDeleteAccount: () -> Unit
+    onDeleteAccount: () -> Unit,
+    onScanLogin: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -320,6 +369,10 @@ private fun MenuCard(
             .background(Color.White, RoundedCornerShape(18.dp))
     ) {
         MenuRow("📖", "操作教程", onTutorial)
+        if (isLogin) {
+            HorizontalDivider(color = AcColor.Separator, thickness = 1.dp, modifier = Modifier.padding(start = 18.dp))
+            MenuRow("💻", "扫码登录电脑版", onScanLogin)
+        }
         HorizontalDivider(color = AcColor.Separator, thickness = 1.dp, modifier = Modifier.padding(start = 18.dp))
         MenuRow("👥", "邀请好友 (送次数)", onInvite)
         if (showRecharge) {

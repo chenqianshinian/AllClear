@@ -71,4 +71,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.zxing.core)
+    // 扫码登录：成熟的相机扫码封装，省掉自己写 CameraX + 解码
+    implementation(libs.zxing.android.embedded)
+    implementation(libs.androidx.appcompat)
 }
