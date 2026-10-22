@@ -152,7 +152,13 @@ bash iOS/scripts/run_sim.sh "iPhone 17 Pro"
 `Android/.../data/Api.kt` 与 `iOS/AllClear/Services/APIClient.swift` 中完整可见，可据此自行实现服务端。
 
 **Q：编译后能直接用吗？**
-可以，客户端默认连线上服务，注册即送体验次数。请勿用脚本批量注册——服务端有 IP 频率限制。
+可以。两端的默认接口地址都是 `https://allclearwatermark.com/api`，注册即可用，和官网、App Store 版共用同一套账号与额度。
+但这只是一个**演示服务器**：新账号只有少量体验次数，额度用完请自行部署服务端或联系客服。请勿用脚本批量注册——服务端有 IP 频率限制。
+
+**Q：怎么换成自己的后端？**
+Android：`./gradlew :app:assembleDebug -PapiBase=https://your-domain.com/api`
+iOS：改 `iOS/AllClear/Services/APIClient.swift` 里的 `baseURL`，或启动参数 `-apiBaseURL`。
+服务端限流怎么做（每日上限 / AI 单独限次），见 [`docs/server-side-limits.md`](docs/server-side-limits.md)。
 
 **Q：iOS 为什么同时提交了 `project.yml` 和 `.xcodeproj`？**
 `.xcodeproj` 是二进制化的文本，多人协作时冲突几乎无法合并。`project.yml` 是可读、可 diff 的工程描述，
