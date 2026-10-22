@@ -129,14 +129,15 @@ fun RechargeDialog(vm: MainViewModel, onDismiss: () -> Unit) {
 
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // 切换支付方式必须作废已生成的订单，否则二维码仍是旧渠道的，用户会扫错
                     FilterChip(
                         selected = method == "alipay",
-                        onClick = { if (!loading) { method = "alipay"; error = "" } },
+                        onClick = { if (!loading) { method = "alipay"; error = ""; order = null } },
                         label = { Text("支付宝") }
                     )
                     FilterChip(
                         selected = method == "wechat",
-                        onClick = { if (!loading) { method = "wechat"; error = "" } },
+                        onClick = { if (!loading) { method = "wechat"; error = ""; order = null } },
                         label = { Text("微信支付") }
                     )
                 }

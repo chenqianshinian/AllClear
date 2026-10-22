@@ -1,4 +1,4 @@
-﻿package com.wuyong.allclear.ui
+package com.wuyong.allclear.ui
 
 import android.app.Application
 import android.content.Context
@@ -253,6 +253,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 .onFailure {
                     if (it is ApiException && it.status == 401) {
+                        // token 已失效：连本地 token / 用户缓存一起清掉，
+                        // 否则下次冷启动仍会因 hasToken() 为 true 而进入「假登录」状态
+                        ApiClient.logout(context)
                         isLogin = false
                         user = null
                     }

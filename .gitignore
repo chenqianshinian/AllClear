@@ -29,7 +29,8 @@ secrets.properties
 *.ipa
 output.json
 
-# ---- 媒体大文件 ----
+# ---- 媒体大文件（演示素材除外）----
 *.mp4
 *.mov
 *.psd
+!iOS/AllClear/Resources/*.mp4

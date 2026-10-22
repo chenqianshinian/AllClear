@@ -14,6 +14,8 @@ targets:
     platform: iOS
     sources:
       - path: AllClear
+      - path: AllClear.storekit
+        buildPhase: none
     info:
       path: AllClear/Info.plist
       properties:
@@ -21,6 +23,7 @@ targets:
         UILaunchScreen: {}
         NSPhotoLibraryUsageDescription: 需要访问相册以选择图片进行去水印处理
         NSPhotoLibraryAddUsageDescription: 需要保存处理后的图片到相册
+        NSCameraUsageDescription: 扫码登录电脑版需要使用相机识别二维码
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -29,12 +32,49 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.wuyong.allclear
         GENERATE_INFOPLIST_FILE: false
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  AllClearTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AllClearTests
+      - path: AllClear.storekit
+        buildPhase: resources
+    dependencies:
+      - target: AllClear
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wuyong.allclear.tests
+        GENERATE_INFOPLIST_FILE: true
+
+  AllClearUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: AllClearUITests
+    dependencies:
+      - target: AllClear
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wuyong.allclear.uitests
+        TEST_TARGET_NAME: AllClear
+        GENERATE_INFOPLIST_FILE: true
+
 schemes:
   AllClear:
     build:
       targets:
         AllClear: all
+        AllClearTests: [test]
+        AllClearUITests: [test]
     run:
       config: Debug
+      storeKitConfiguration: AllClear.storekit
     archive:
       config: Release
+    test:
+      config: Debug
+      targets:
+        - AllClearTests
+        - AllClearUITests

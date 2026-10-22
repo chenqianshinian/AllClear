@@ -1,5 +1,5 @@
+# 构建产物（本仓库提交 .xcodeproj 方便直接打开，只忽略本地产物）
 build/
-*.xcodeproj
 DerivedData/
 *.xcuserstate
 xcuserdata/

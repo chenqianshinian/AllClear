@@ -1,370 +1,688 @@
 import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
+import UIKit
 
-/// 本地已选文件
-struct PickedFile: Identifiable {
-    let id = UUID()
-    let url: URL
-    let name: String
-    let sizeMB: Double
-
-    var isVideo: Bool { ["mp4", "mov", "avi"].contains(url.pathExtension.lowercased()) }
-}
-
-/// 处理结果
-struct ResultFile: Identifiable {
-    let id = UUID()
-    let url: URL
-    let filename: String
-
-    var ext: String { url.pathExtension.lowercased() }
-    var isVideo: Bool { ["mp4", "mov", "avi"].contains(ext) }
-    var isImage: Bool { ["jpg", "jpeg", "png", "heic", "webp", "bmp"].contains(ext) }
-}
-
-/// 去水印主界面（对应鸿蒙版 RemoveWatermarkView）
+/// 去水印主界面（逐项对齐鸿蒙端 pages/index/index.tsx）
 struct RemoveWatermarkView: View {
     @ObservedObject private var session = Session.shared
+    @ObservedObject private var app = AppState.shared
 
-    @State private var mode = 0                                   // 0 图片与视频，1 PDF与文档
+    @State private var activeTab: FileTab = .media
     @State private var images: [PickedFile] = []
-    @State private var video: PickedFile?
-    @State private var documents: [PickedFile] = []
-
-    @State private var isProcessing = false
-    @State private var progress: Double = 0
+    @State private var document: PickedFile?
+    @State private var status: ProcessStatus = .idle
     @State private var results: [ResultFile] = []
+    @State private var useAI = false
+    @State private var docPrompt = ""
 
-    @State private var photoSelection: [PhotosPickerItem] = []
-    @State private var videoSelection: PhotosPickerItem?
+    @State private var replacePhotoItems: [PhotosPickerItem] = []
+    @State private var appendPhotoItems: [PhotosPickerItem] = []
+    @State private var videoItem: PhotosPickerItem?
     @State private var showDocumentImporter = false
+
+    @State private var previewURLs: [URL] = []
+    @State private var previewStartIndex = 0
+    @State private var showPreview = false
+
+    @State private var alertKind: IndexAlert?
     @State private var showShare = false
     @State private var shareItems: [Any] = []
-    @State private var isSaving = false
+    @State private var demoVideoOpened = false
+
+    private enum IndexAlert: Identifiable {
+        case switchTab(FileTab)
+        case charge(count: Int, cost: Int)
+
+        var id: String {
+            switch self {
+            case .switchTab(let tab): return "switch-\(tab.rawValue)"
+            case .charge(let count, let cost): return "charge-\(count)-\(cost)"
+            }
+        }
+    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    Picker("模式", selection: $mode) {
-                        Text("图片与视频").tag(0)
-                        Text("PDF与文档").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                header
 
-                    if mode == 0 { mediaSection } else { documentSection }
-                }
-                .padding(.bottom, 32)
+                card
+                    .padding(.horizontal, 16)
+                    .padding(.top, -64)
+                    .zIndex(2)
+
+                resultsSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+
+                Spacer(minLength: 28)
             }
-            .background(Color.white)
-            .navigationTitle("去水印")
-            .navigationBarTitleDisplayMode(.inline)
         }
-        .sheet(isPresented: $showShare) { ActivityView(items: shareItems) }
+        .background(ACColor.gray100)
+        .ignoresSafeArea(edges: .top)
+        .alert(item: $alertKind) { alert in
+            switch alert {
+            case .switchTab(let target):
+                return Alert(
+                    title: Text("切换确认"),
+                    message: Text("当前有未保存的进度或结果，切换标签将清空它们。确定要切换吗？"),
+                    primaryButton: .default(Text("确定")) {
+                        activeTab = target
+                        clearAll()
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
+            case .charge(let count, let cost):
+                return Alert(
+                    title: Text("扣费确认"),
+                    message: Text("本次选择了 \(count) 张图片，使用\(useAI ? "AI 超强去水印" : "常规去水印")，将扣除 \(cost) 次额度（剩余 \(session.points) 次）。确认处理吗？"),
+                    primaryButton: .default(Text("确定")) {
+                        Task { await execute(prompt: docPrompt) }
+                    },
+                    secondaryButton: .cancel(Text("取消"))
+                )
+            }
+        }
+        .fullScreenCover(isPresented: $showPreview) {
+            ACImagePreview(urls: previewURLs, startIndex: previewStartIndex)
+        }
+        .sheet(isPresented: $showShare) {
+            ShareSheet(items: shareItems)
+        }
         .fileImporter(
             isPresented: $showDocumentImporter,
             allowedContentTypes: documentTypes,
-            allowsMultipleSelection: true
+            allowsMultipleSelection: false
         ) { result in
-            if case .success(let urls) = result { Task { await loadDocuments(urls) } }
+            handleImporterResult(result)
         }
-        .onChange(of: photoSelection) { _, items in
+        .onChange(of: replacePhotoItems) { _, items in
             guard !items.isEmpty else { return }
-            Task { await loadImages(items) }
+            Task { await loadImages(items, append: false) }
         }
-        .onChange(of: videoSelection) { _, item in
+        .onChange(of: appendPhotoItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task { await loadImages(items, append: true) }
+        }
+        .onChange(of: videoItem) { _, item in
             guard let item else { return }
-            Task { await loadVideo(item) }
+            Task { await openVideoEditor(item) }
+        }
+        .task {
+            await loadDemoImageIfNeeded()
+            await loadDemoDocumentIfNeeded()
+            await loadDemoVideoIfNeeded()
         }
     }
 
-    // MARK: - 图片与视频
-    private var mediaSection: some View {
-        VStack(spacing: 0) {
-            selectionBox(
-                files: images + (video.map { [$0] } ?? []),
-                placeholder: "请在下方选择图片或视频\n(支持批量选择处理)",
-                onDelete: { id in
-                    images.removeAll { $0.id == id }
-                    if video?.id == id { video = nil }
-                }
-            )
+    /// 仅 DEBUG：通过 -demoImage 预置一张带水印样图，便于模拟器端到端验收
+    @MainActor
+    private func loadDemoImageIfNeeded() async {
+        #if DEBUG
+        guard images.isEmpty, document == nil,
+              ProcessInfo.processInfo.arguments.contains("-demoImage"),
+              let source = Bundle.main.url(forResource: "demo_watermark", withExtension: "jpg"),
+              let data = try? Data(contentsOf: source) else { return }
+        let name = "demo_watermark.jpg"
+        let url = URL.temporaryDirectory.appending(path: "demo_\(UUID().uuidString).jpg")
+        guard (try? data.write(to: url)) != nil else { return }
+        images = [PickedFile(url: url, name: name, sizeMB: Double(data.count) / 1024 / 1024, kind: .image)]
+        status = .idle
+        results = []
+        #endif
+    }
 
-            HStack(spacing: 16) {
-                PhotosPicker(selection: $photoSelection,
-                             maxSelectionCount: max(1, session.maxSelectCount - images.count),
-                             matching: .images) {
-                    Text("🖼 传图片").frame(maxWidth: .infinity).frame(height: 48)
-                }
-                .background(ACColor.cardBG)
-                .foregroundStyle(ACColor.primary)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+    /// 仅 DEBUG：通过 -demoDocument 预置一份带水印 PDF
+    @MainActor
+    private func loadDemoDocumentIfNeeded() async {
+        #if DEBUG
+        guard document == nil, images.isEmpty,
+              ProcessInfo.processInfo.arguments.contains("-demoDocument"),
+              let source = Bundle.main.url(forResource: "demo_document", withExtension: "pdf"),
+              let data = try? Data(contentsOf: source) else { return }
+        let name = "demo_document.pdf"
+        let url = URL.temporaryDirectory.appending(path: "demo_\(UUID().uuidString).pdf")
+        guard (try? data.write(to: url)) != nil else { return }
+        activeTab = .document
+        document = PickedFile(url: url, name: name, sizeMB: Double(data.count) / 1024 / 1024, kind: .document)
+        status = .idle
+        results = []
+        #endif
+    }
 
-                PhotosPicker(selection: $videoSelection, matching: .videos) {
-                    Text("🎬 传视频").frame(maxWidth: .infinity).frame(height: 48)
-                }
-                .background(ACColor.cardBG)
-                .foregroundStyle(ACColor.primary)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+    /// 仅 DEBUG：通过 -demoVideo 直接进入视频框选页
+    @MainActor
+    private func loadDemoVideoIfNeeded() async {
+        #if DEBUG
+        guard !demoVideoOpened,
+              ProcessInfo.processInfo.arguments.contains("-demoVideo"),
+              let source = Bundle.main.url(forResource: "demo_video", withExtension: "mp4") else { return }
+        demoVideoOpened = true
+        let url = URL.temporaryDirectory.appending(path: "demo_\(UUID().uuidString).mp4")
+        guard (try? FileManager.default.copyItem(at: source, to: url)) != nil else { return }
+        let size = await VideoTools.displaySize(for: url)
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        app.removePath.append(.videoEdit(VideoEditInput(url: url, width: size.width, height: size.height)))
+        #endif
+    }
+
+    // MARK: - 顶部头图
+
+    private var header: some View {
+        ACBlueHeader(topPadding: 64, bottomPadding: 96, horizontalPadding: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("水印天敌")
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .tracking(0.5)
+                Text("一键无痕去除图片/视频/文档水印")
+                    .font(.system(size: 14))
+                    .foregroundStyle(ACColor.blue100.opacity(0.92))
             }
-            .font(.system(size: 16))
-            .padding(.top, 24)
-
-            processButton(files: images + (video.map { [$0] } ?? []))
-            progressBar
-            resultSection
         }
-        .padding(.horizontal, 16)
     }
 
-    // MARK: - PDF 与文档
-    private var documentSection: some View {
+    // MARK: - 核心卡片
+
+    private var card: some View {
         VStack(spacing: 0) {
-            selectionBox(
-                files: documents,
-                placeholder: "请在下方选择 PDF / Word / PPT\n(单个文件最大 30MB)",
-                onDelete: { id in documents.removeAll { $0.id == id } }
-            )
+            segmentedTabs
+                .padding(.bottom, 24)
+
+            previewArea
+                .padding(.bottom, 24)
+
+            actionButtons
+                .padding(.bottom, 24)
+
+            if !images.isEmpty {
+                aiRow
+                    .padding(.bottom, 16)
+            }
+
+            processButton
+        }
+        .padding(24)
+        .acCard(cornerRadius: 24)
+    }
+
+    private var segmentedTabs: some View {
+        HStack(spacing: 0) {
+            tabButton(.media)
+            tabButton(.document)
+        }
+        .padding(4)
+        .background(ACColor.gray100)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func tabButton(_ tab: FileTab) -> some View {
+        Button {
+            requestTabSwitch(tab)
+        } label: {
+            Text(tab.title)
+                .font(.system(size: 14, weight: activeTab == tab ? .bold : .regular))
+                .foregroundStyle(activeTab == tab ? ACColor.blue600 : ACColor.gray500)
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+                .background(activeTab == tab ? Color.white : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .shadow(color: .black.opacity(activeTab == tab ? 0.05 : 0), radius: 3, y: 1)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 文件预览区
+
+    private var previewArea: some View {
+        Group {
+            if activeTab == .document, let document {
+                documentPreview(document)
+            } else if !images.isEmpty {
+                imageGrid
+            } else {
+                Text(activeTab == .media ? "请在下方选择图片或视频" : "请从文件选择文档")
+                    .font(.system(size: 14))
+                    .foregroundStyle(ACColor.gray400)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 192)
+        .padding(8)
+        .background(ACColor.gray50)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            DashedRoundedBorder(cornerRadius: 12)
+        }
+    }
+
+    private var imageGrid: some View {
+        CenteredFlowLayout(spacing: 8, lineSpacing: 8) {
+            ForEach(images) { image in
+                imageThumb(image)
+            }
+            if images.count < session.maxSelectCount {
+                addImageTile
+            }
+        }
+    }
+
+    private func imageThumb(_ file: PickedFile) -> some View {
+        ZStack(alignment: .topTrailing) {
+            FileOrRemoteImage(url: file.url, contentMode: .fill)
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(ACColor.gray200, lineWidth: 1)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    preview(urls: images.map(\.url), index: images.firstIndex(of: file) ?? 0)
+                }
 
             Button {
-                showDocumentImporter = true
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    images.removeAll { $0.id == file.id }
+                    results = []
+                    status = .idle
+                }
             } label: {
-                Text("📄 选择文档").frame(maxWidth: .infinity).frame(height: 48)
+                Text("×")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(ACColor.red500)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
             }
-            .font(.system(size: 16))
-            .background(ACColor.cardBG)
-            .foregroundStyle(ACColor.primary)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .padding(.top, 24)
+            .buttonStyle(.plain)
+            .offset(x: 8, y: -8)
+        }
+        .frame(width: 80, height: 80)
+    }
 
-            processButton(files: documents)
-            progressBar
-            resultSection
+    private var addImageTile: some View {
+        PhotosPicker(
+            selection: $appendPhotoItems,
+            maxSelectionCount: max(1, session.maxSelectCount - images.count),
+            matching: .images,
+            photoLibrary: .shared()
+        ) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(ACColor.gray50)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(ACColor.gray300, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                Text("+")
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(ACColor.gray400)
+            }
+            .frame(width: 80, height: 80)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func documentPreview(_ file: PickedFile) -> some View {
+        VStack(spacing: 8) {
+            Text("📄")
+                .font(.system(size: 36))
+            Text(file.name)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(ACColor.gray700)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+            Text("文档已就绪")
+                .font(.system(size: 12))
+                .foregroundStyle(ACColor.gray400)
         }
         .padding(.horizontal, 16)
     }
 
-    // MARK: - 选择区
-    private func selectionBox(files: [PickedFile], placeholder: String, onDelete: @escaping (UUID) -> Void) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6]))
-                .foregroundStyle(Color(hex: 0xE5E5E5))
+    // MARK: - 选择按钮
 
-            if files.isEmpty {
-                Text(placeholder)
-                    .font(.system(size: 14))
-                    .foregroundStyle(ACColor.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(8)
-            } else {
-                VStack(spacing: 8) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(files) { file in
-                                ZStack(alignment: .topTrailing) {
-                                    preview(file)
-                                        .frame(width: 120, height: 130)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    Button {
-                                        onDelete(file.id)
-                                    } label: {
-                                        Text("✕")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(.white)
-                                            .frame(width: 20, height: 20)
-                                            .background(.black.opacity(0.5))
-                                            .clipShape(Circle())
-                                    }
-                                    .padding(4)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.top, 8)
+    private var actionButtons: some View {
+        Group {
+            if activeTab == .media {
+                HStack(spacing: 12) {
+                    PhotosPicker(
+                        selection: $replacePhotoItems,
+                        maxSelectionCount: session.maxSelectCount,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Text("🖼️ 传图片")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(ACColor.blue600)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(ACColor.blue50)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
+                    .buttonStyle(.plain)
 
-                    Text("已选择 \(files.count) 个文件")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
-                        .background(.black.opacity(0.5))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 8)
-                }
-            }
-        }
-        .frame(height: 200)
-        .padding(.top, 24)
-    }
-
-    @ViewBuilder
-    private func preview(_ file: PickedFile) -> some View {
-        if file.isVideo {
-            ZStack {
-                Color.black
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 32))
-                    .foregroundStyle(.white)
-            }
-        } else if let image = UIImage(contentsOfFile: file.url.path) {
-            Image(uiImage: image).resizable().scaledToFill()
-        } else {
-            Color(hex: 0xF5F6F8)
-        }
-    }
-
-    // MARK: - 处理按钮
-    private func processButton(files: [PickedFile]) -> some View {
-        VStack(spacing: 12) {
-            if files.count == 1 {
-                Text("💡 复杂全屏水印选【智能】，顽固局部水印选【手动】")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color(hex: 0xFF9800))
-                    .multilineTextAlignment(.center)
-
-                HStack(spacing: 16) {
-                    Button {
-                        Task { await process() }
-                    } label: {
-                        Text(isProcessing ? "处理中..." : "✨ 智能去除")
-                            .frame(maxWidth: .infinity).frame(height: 50)
+                    PhotosPicker(
+                        selection: $videoItem,
+                        matching: .videos,
+                        photoLibrary: .shared()
+                    ) {
+                        Text("🎬 传视频")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(ACColor.blue600)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(ACColor.blue50)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    .background(isProcessing ? Color(hex: 0xD5D7DC) : ACColor.primary)
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-                    .disabled(isProcessing)
-
-                    Button {
-                        Toast.shared.show("手动框选功能开发中，先试试智能去除")
-                    } label: {
-                        Text("📝 手动框选")
-                            .frame(maxWidth: .infinity).frame(height: 50)
-                    }
-                    .background(ACColor.cardBG)
-                    .foregroundStyle(ACColor.primary)
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
                 }
             } else {
                 Button {
-                    Task { await process() }
+                    showDocumentImporter = true
                 } label: {
-                    Text(isProcessing ? "处理中..." : (files.isEmpty ? "✨ 立即去除水印" : "✨ 立即去除水印 (\(files.count))"))
-                        .frame(maxWidth: .infinity).frame(height: 50)
+                    Text("📁 从文件选择文档 (PDF/Word/PPT)")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(ACColor.blue600)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .background(isProcessing || files.isEmpty ? Color(hex: 0xD5D7DC) : ACColor.primary)
-                .foregroundStyle(.white)
-                .clipShape(Capsule())
-                .disabled(isProcessing || files.isEmpty)
+                .buttonStyle(.plain)
+                .acBlueShadow()
             }
         }
-        .font(.system(size: 16))
-        .padding(.top, 24)
     }
 
-    @ViewBuilder
-    private var progressBar: some View {
-        if isProcessing {
-            VStack(spacing: 6) {
-                ProgressView(value: min(max(progress, 0), 100), total: 100)
-                    .tint(ACColor.primary)
-                Text("处理进度 \(Int(min(max(progress, 0), 100)))%")
+    private var aiRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("✨ 启用 AI 超强去水印")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(ACColor.gray800)
+                Text("消耗 5 次额度/张，效果更佳")
                     .font(.system(size: 12))
-                    .foregroundStyle(ACColor.body)
+                    .foregroundStyle(ACColor.gray500)
             }
-            .padding(.top, 16)
+            Spacer()
+            Toggle("", isOn: $useAI)
+                .labelsHidden()
+                .tint(ACColor.blue500)
         }
+        .padding(12)
+        .background(ACColor.gray50)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var processButton: some View {
+        Button {
+            handleProcess()
+        } label: {
+            Text(status == .processing ? "处理中..." : "✨ 立即去除水印")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(processButtonColor)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("remove.process")
+        .disabled(status == .processing)
+        .acBlueShadow(hasFiles && status != .processing)
+    }
+
+    private var processButtonColor: Color {
+        if !hasFiles { return ACColor.gray300 }
+        if status == .processing { return ACColor.blue400 }
+        return ACColor.blue600
     }
 
     // MARK: - 结果区
+
     @ViewBuilder
-    private var resultSection: some View {
-        if !results.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+    private var resultsSection: some View {
+        if status == .success, !results.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("处理结果")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(ACColor.title)
-                    .padding(.top, 24)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(ACColor.gray800)
+                    .padding(.bottom, 16)
 
-                ForEach(results) { result in
-                    VStack(alignment: .leading, spacing: 8) {
-                        if result.isImage {
-                            AsyncImage(url: result.url) { image in
-                                image.resizable().scaledToFit()
-                            } placeholder: {
-                                ProgressView().frame(maxWidth: .infinity, minHeight: 120)
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            HStack {
-                                Image(systemName: result.isVideo ? "film" : "doc")
-                                Text(result.filename).font(.system(size: 14)).lineLimit(1)
-                            }
-                        }
+                resultPreview
+                    .padding(.bottom, 16)
 
-                        HStack(spacing: 16) {
-                            Button {
-                                Task { await save(result) }
-                            } label: {
-                                Text(saveButtonTitle(result))
-                                    .frame(maxWidth: .infinity).frame(height: 44)
-                            }
-                            .background(ACColor.primary)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .disabled(isSaving)
-
-                            Button {
-                                Task { await shareResult(result) }
-                            } label: {
-                                Text("📤 用其他应用打开")
-                                    .frame(maxWidth: .infinity).frame(height: 44)
-                            }
-                            .background(ACColor.primary)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .disabled(isSaving)
-                        }
-                        .font(.system(size: 15))
-                    }
-                    .padding(12)
-                    .background(Color(hex: 0xFAFAFA))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                if activeKind == .document {
+                    documentRetryPanel
+                        .padding(.bottom, 16)
                 }
+
+                Button {
+                    Task {
+                        if activeKind == .document {
+                            await openDocument()
+                        } else {
+                            await saveAllImages()
+                        }
+                    }
+                } label: {
+                    Text(activeKind == .document ? "📥 打开/分享文档" : "💾 保存全部到相册")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(ACColor.green500)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("remove.save")
+
+                HStack {
+                    Spacer()
+                    Button {
+                        clearAll()
+                    } label: {
+                        Text("🗑️ 清空并继续处理")
+                            .font(.system(size: 14))
+                            .foregroundStyle(ACColor.gray400)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
+                            .overlay {
+                                Capsule().stroke(ACColor.gray200, lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.top, 24)
             }
+            .padding(24)
+            .acCard(cornerRadius: 16)
         }
     }
 
-    private func saveButtonTitle(_ result: ResultFile) -> String {
-        if result.isImage || result.isVideo { return "💾 保存到相册" }
-        return "💾 保存到本地"
+    private var resultPreview: some View {
+        Group {
+            if activeKind == .document {
+                VStack(spacing: 8) {
+                    Text("✅").font(.system(size: 36))
+                    Text("文档处理完成")
+                        .font(.system(size: 14))
+                        .foregroundStyle(ACColor.gray500)
+                }
+                .frame(maxWidth: .infinity, minHeight: 128)
+            } else {
+                CenteredFlowLayout(spacing: 8, lineSpacing: 8) {
+                    ForEach(results) { result in
+                        FileOrRemoteImage(url: result.url, contentMode: .fill)
+                            .frame(width: 80, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(ACColor.gray200, lineWidth: 1)
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                preview(urls: results.map(\.url), index: results.firstIndex(of: result) ?? 0)
+                            }
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 128)
+            }
+        }
+        .padding(8)
+        .background(ACColor.gray100)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(ACColor.gray200, lineWidth: 1)
+        }
+    }
+
+    private var documentRetryPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("处理结果不满意？")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(ACColor.orange800)
+            Text("如果部分顽固水印未能自动去除，您可以尝试输入水印文字进行强力擦除：")
+                .font(.system(size: 12))
+                .foregroundStyle(ACColor.orange600)
+                .padding(.bottom, 4)
+
+            HStack(spacing: 8) {
+                TextField("例如: 绝密资料", text: $docPrompt)
+                    .font(.system(size: 14))
+                    .foregroundStyle(ACColor.gray800)
+                    .padding(.horizontal, 12)
+                    .frame(height: 38)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(ACColor.orange100, lineWidth: 1)
+                    }
+
+                Button {
+                    let prompt = docPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !prompt.isEmpty else {
+                        Toast.shared.show("请输入水印文字")
+                        return
+                    }
+                    guard session.isLogin else {
+                        Toast.shared.show("请先前往\"我的\"页面登录")
+                        app.switchTo(.mine)
+                        return
+                    }
+                    Task { await execute(prompt: prompt) }
+                } label: {
+                    Text("重试")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .frame(height: 38)
+                        .background(ACColor.orange500)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(status == .processing)
+            }
+        }
+        .padding(16)
+        .background(ACColor.orange50)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(ACColor.orange100, lineWidth: 1)
+        }
+    }
+
+    // MARK: - 派生状态
+
+    private var hasFiles: Bool { !images.isEmpty || document != nil }
+
+    private var activeKind: PickedKind? {
+        if !images.isEmpty { return .image }
+        if document != nil { return .document }
+        return results.first?.kind
     }
 
     private var documentTypes: [UTType] {
         var types: [UTType] = [.pdf]
-        for ext in ["docx", "doc", "pptx", "ppt"] {
+        for ext in ["doc", "docx", "ppt", "pptx"] {
             if let type = UTType(filenameExtension: ext) { types.append(type) }
         }
         return types
     }
 
-    private var currentFiles: [PickedFile] { mode == 0 ? images + (video.map { [$0] } ?? []) : documents }
+    // MARK: - 交互
 
-    // MARK: - 载入素材
-    private func loadImages(_ items: [PhotosPickerItem]) async {
-        defer { photoSelection = [] }
-        for item in items {
-            guard images.count < session.maxSelectCount else {
-                Toast.shared.show("最多只能选择 \(session.maxSelectCount) 个文件")
-                break
+    private func requestTabSwitch(_ target: FileTab) {
+        guard activeTab != target else { return }
+        if !images.isEmpty || document != nil || status == .processing || status == .success {
+            alertKind = .switchTab(target)
+        } else {
+            activeTab = target
+        }
+    }
+
+    private func clearAll() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            images = []
+            document = nil
+            status = .idle
+            results = []
+            docPrompt = ""
+        }
+        replacePhotoItems = []
+        appendPhotoItems = []
+        videoItem = nil
+    }
+
+    private func handleProcess() {
+        guard hasFiles else {
+            Toast.shared.show("请先选择文件")
+            return
+        }
+        guard session.isLogin else {
+            Toast.shared.show("请先前往\"我的\"页面登录")
+            app.switchTo(.mine)
+            return
+        }
+
+        if activeKind == .image {
+            // 后端 /remove-image-watermark 当前固定扣 1 次/张，use_ai 不额外计费；
+            // 这里必须与后端保持一致，否则确认弹窗承诺的扣费次数是错的。
+            let cost = images.count
+            guard session.points >= cost else {
+                Toast.shared.show("剩余 \(session.points) 次，本次需要 \(cost) 次，请先获取额度", duration: 3)
+                return
             }
-            guard let raw = try? await item.loadTransferable(type: Data.self) else { continue }
-            // 统一转成 JPEG，兼容后端处理链路
-            guard let image = UIImage(data: raw), let jpeg = image.jpegData(compressionQuality: 0.92) else { continue }
+            alertKind = .charge(count: images.count, cost: cost)
+        } else {
+            Task { await execute(prompt: docPrompt) }
+        }
+    }
+
+    private func preview(urls: [URL], index: Int) {
+        guard !urls.isEmpty else { return }
+        previewURLs = urls
+        previewStartIndex = index
+        showPreview = true
+    }
+
+    // MARK: - 素材读取
+
+    @MainActor
+    private func loadImages(_ items: [PhotosPickerItem], append: Bool) async {
+        defer {
+            replacePhotoItems = []
+            appendPhotoItems = []
+        }
+        var loaded: [PickedFile] = []
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.92) else { continue }
             let sizeMB = Double(jpeg.count) / 1024 / 1024
             if sizeMB > session.maxImageMB {
                 Toast.shared.show("包含超过 \(Int(session.maxImageMB))MB 的图片！当前最多支持 \(Int(session.maxImageMB))MB，请重新选择")
@@ -374,200 +692,286 @@ struct RemoveWatermarkView: View {
             let url = URL.temporaryDirectory.appending(path: name)
             do {
                 try jpeg.write(to: url)
-                images.append(PickedFile(url: url, name: name, sizeMB: sizeMB))
-            } catch { continue }
+                loaded.append(PickedFile(url: url, name: name, sizeMB: sizeMB, kind: .image))
+            } catch {
+                continue
+            }
+        }
+        guard !loaded.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            if append {
+                images = Array((images + loaded).prefix(session.maxSelectCount))
+            } else {
+                images = Array(loaded.prefix(session.maxSelectCount))
+            }
+            document = nil
+            status = .idle
+            results = []
+            docPrompt = ""
         }
     }
 
-    private func loadVideo(_ item: PhotosPickerItem) async {
-        defer { videoSelection = nil }
+    @MainActor
+    private func openVideoEditor(_ item: PhotosPickerItem) async {
+        videoItem = nil
+        LoadingCenter.shared.show("加载视频...")
         guard let movie = try? await item.loadTransferable(type: MovieFile.self) else {
+            LoadingCenter.shared.hide()
             Toast.shared.show("读取视频失败，请重试")
             return
         }
-        let attributes = try? FileManager.default.attributesOfItem(atPath: movie.url.path)
-        let bytes = (attributes?[.size] as? NSNumber)?.doubleValue ?? 0
-        let size = bytes / 1024 / 1024
-        let maxMB = session.isVip ? 50.0 : 10.0
-        guard size <= maxMB else {
-            Toast.shared.show("视频超过 \(Int(maxMB))MB 限制，请重新选择")
+        let size = VideoTools.fileSizeMB(movie.url)
+        guard size <= session.maxVideoMB else {
+            LoadingCenter.shared.hide()
+            Toast.shared.show("视频超过 \(Int(session.maxVideoMB))MB 限制，请重新选择")
             return
         }
-        video = PickedFile(url: movie.url, name: movie.url.lastPathComponent, sizeMB: size)
+        let dimensions = await VideoTools.displaySize(for: movie.url)
+        LoadingCenter.shared.hide()
+        app.removePath.append(.videoEdit(VideoEditInput(url: movie.url, width: dimensions.width, height: dimensions.height)))
     }
 
-    private func loadDocuments(_ urls: [URL]) async {
-        for url in urls {
-            guard documents.count < session.maxSelectCount else {
-                Toast.shared.show("最多只能选择 \(session.maxSelectCount) 个文件")
-                break
-            }
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-            guard let data = try? Data(contentsOf: url) else { continue }
-            let sizeMB = Double(data.count) / 1024 / 1024
-            if sizeMB > session.maxDocumentMB {
-                Toast.shared.show("包含超过 30MB 的文档！当前最多支持 30MB")
-                continue
-            }
-            let name = url.lastPathComponent
-            let local = URL.temporaryDirectory.appending(path: "\(UUID().uuidString)_\(name)")
-            do {
-                try data.write(to: local)
-                documents.append(PickedFile(url: local, name: name, sizeMB: sizeMB))
-            } catch { continue }
+    private func handleImporterResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            Task { await loadDocument(url) }
+        case .failure:
+            break
+        }
+    }
+
+    @MainActor
+    private func loadDocument(_ url: URL) async {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = try? Data(contentsOf: url) else {
+            Toast.shared.show("读取文档失败，请重新选择")
+            return
+        }
+        let sizeMB = Double(data.count) / 1024 / 1024
+        guard sizeMB <= session.maxDocumentMB else {
+            Toast.shared.show("文档超过 \(Int(session.maxDocumentMB))MB 限制，请重新选择")
+            return
+        }
+        let name = url.lastPathComponent
+        let local = URL.temporaryDirectory.appending(path: "doc_\(UUID().uuidString)_\(name)")
+        do {
+            try data.write(to: local)
+        } catch {
+            Toast.shared.show("读取文档失败，请重新选择")
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            document = PickedFile(url: local, name: name, sizeMB: sizeMB, kind: .document)
+            images = []
+            status = .idle
+            results = []
+            docPrompt = ""
         }
     }
 
     // MARK: - 处理
-    private func process() async {
-        let files = currentFiles
-        guard !files.isEmpty else {
+
+    @MainActor
+    private func execute(prompt: String) async {
+        guard status != .processing else { return }
+
+        let kind: PickedKind
+        let files: [PickedFile]
+        if !images.isEmpty {
+            kind = .image
+            files = images
+        } else if let document {
+            kind = .document
+            files = [document]
+        } else {
             Toast.shared.show("请先选择文件")
             return
         }
-        guard session.isLogin else {
-            Toast.shared.show("请先登录")
-            return
-        }
 
-        // 次数预检查（与鸿蒙版一致：每处理 1 个文件消耗 1 次）
-        var pending = files
-        if session.points < files.count {
-            let canProcess = session.points
-            guard canProcess > 0 else {
-                Toast.shared.show("次数不足！处理1个文件需要1次，请前往“我的”页面获取次数")
-                return
-            }
-            Toast.shared.show("次数不足，剩余\(canProcess)次，本次只可以处理\(canProcess)个")
-            pending = Array(files.prefix(canProcess))
-        }
-
-        isProcessing = true
-        progress = 0
+        status = .processing
         results = []
+        LoadingCenter.shared.show(files.count > 1 ? "处理中 0/\(files.count)" : "AI处理中...")
 
-        if mode == 0 {
-            await processMedia(pending)
-        } else {
-            await processDocuments(pending)
+        do {
+            switch kind {
+            case .image:
+                try await processImages(files)
+            case .document:
+                try await processDocument(files[0], prompt: prompt)
+            case .video:
+                break
+            }
+            LoadingCenter.shared.hide()
+            status = .success
+            Toast.shared.success("全部处理完成")
+            await session.refreshUserInfo()
+        } catch {
+            LoadingCenter.shared.hide()
+            status = .idle
+            let apiError = error as? APIError
+            let message = apiError?.errorDescription ?? "网络异常或服务繁忙，请稍后再试"
+            Toast.shared.show(message, duration: apiError?.isQuotaError == true ? 3.0 : 2.0)
         }
-
-        progress = 100
-        isProcessing = false
-        await session.refreshUserInfo()
     }
 
-    private func processMedia(_ files: [PickedFile]) async {
-        var success: [ResultFile] = []
-        var failed = 0
-        for (index, file) in files.enumerated() {
-            do {
-                let data = try Data(contentsOf: file.url)
-                let response = try await APIClient.shared.removeWatermarkBatch(
-                    fileData: data,
-                    filename: file.name,
-                    fileType: file.isVideo ? "video" : "image"
-                ) { percent in
-                    progress = Double(index) / Double(files.count) * 100 + percent / Double(files.count)
+    @MainActor
+    private func processImages(_ files: [PickedFile]) async throws {
+        let useAI = self.useAI
+        var remoteURLs = [URL?](repeating: nil, count: files.count)
+        var firstError: Error?
+        var completed = 0
+
+        await withTaskGroup(of: (Int, Result<URL, Error>).self) { group in
+            for (index, file) in files.enumerated() {
+                group.addTask {
+                    do {
+                        let data = try Data(contentsOf: file.url)
+                        let url = try await APIClient.shared.removeImage(
+                            fileData: data,
+                            filename: file.name,
+                            useAI: useAI
+                        )
+                        return (index, .success(url))
+                    } catch {
+                        return (index, .failure(error))
+                    }
                 }
-                if let remaining = response.remainingPoints { session.updatePoints(remaining) }
-                if let first = response.results.first,
-                   let raw = first.resultUrl,
-                   let url = APIClient.shared.absoluteResultURL(raw) {
-                    success.append(ResultFile(url: url, filename: first.filename))
-                } else {
-                    failed += 1
+            }
+
+            for await (index, result) in group {
+                completed += 1
+                if files.count > 1 {
+                    LoadingCenter.shared.update("处理中 \(completed)/\(files.count)")
                 }
-            } catch {
-                failed += 1
+                switch result {
+                case .success(let url):
+                    remoteURLs[index] = url
+                case .failure(let error):
+                    if firstError == nil { firstError = error }
+                }
             }
         }
-        finish(success: success, failed: failed, failureNote: "失败次数已自动返还")
-    }
 
-    private func processDocuments(_ files: [PickedFile]) async {
-        var success: [ResultFile] = []
-        var failed = 0
-        for (index, file) in files.enumerated() {
-            let ext = file.name.lowercased()
-            let endpoint: String
-            if ext.hasSuffix(".pdf") { endpoint = "remove-pdf-watermark" }
-            else if ext.hasSuffix(".docx") || ext.hasSuffix(".doc") { endpoint = "remove-docx-watermark" }
-            else if ext.hasSuffix(".pptx") || ext.hasSuffix(".ppt") { endpoint = "remove-pptx-watermark" }
-            else { endpoint = "remove-pdf-watermark" }
+        if let firstError { throw firstError }
+        guard remoteURLs.allSatisfy({ $0 != nil }) else {
+            throw APIError.decoding("部分文件未返回处理结果")
+        }
+        let urls = remoteURLs.compactMap { $0 }
 
-            progress = Double(index) / Double(files.count) * 100
-            do {
-                let data = try Data(contentsOf: file.url)
-                let raw = try await APIClient.shared.removeDocument(endpoint: endpoint, fileData: data, filename: file.name)
-                if let url = APIClient.shared.absoluteResultURL(raw) {
-                    success.append(ResultFile(url: url, filename: file.name))
-                } else {
-                    failed += 1
+        // 与鸿蒙端一致：先下载到本地做预览，失败则回落到远程 URL
+        var localURLs = [URL?](repeating: nil, count: urls.count)
+        var previewCount = 0
+        await withTaskGroup(of: (Int, URL).self) { group in
+            for (index, remote) in urls.enumerated() {
+                group.addTask {
+                    let ext = remote.pathExtension.isEmpty ? "jpg" : remote.pathExtension
+                    let name = "result_\(index)_\(UUID().uuidString).\(ext)"
+                    if let local = try? await MediaSaver.download(remote, suggestedName: name) {
+                        return (index, local)
+                    }
+                    return (index, remote)
                 }
-            } catch {
-                failed += 1
+            }
+            for await (index, url) in group {
+                previewCount += 1
+                if urls.count > 1 {
+                    LoadingCenter.shared.update("生成预览 \(previewCount)/\(urls.count)")
+                }
+                localURLs[index] = url
             }
         }
-        finish(success: success, failed: failed, failureNote: "失败次数不扣除")
+
+        let items = zip(localURLs.compactMap { $0 }, files).map { url, file in
+            ResultFile(url: url, filename: file.name, kind: .image)
+        }
+        guard items.count == files.count else {
+            throw APIError.decoding("图片处理结果不完整")
+        }
+        results = items
     }
 
-    private func finish(success: [ResultFile], failed: Int, failureNote: String) {
-        if !success.isEmpty {
-            results = success
-            Toast.shared.show(failed == 0
-                ? "全部 \(success.count) 个文件处理成功！"
-                : "\(success.count)个成功，\(failed)个失败，\(failureNote)")
+    @MainActor
+    private func processDocument(_ file: PickedFile, prompt: String) async throws {
+        let lower = file.name.lowercased()
+        let endpoint: String
+        if lower.hasSuffix(".pdf") {
+            endpoint = "remove-pdf-watermark"
+        } else if lower.hasSuffix(".docx") || lower.hasSuffix(".doc") {
+            endpoint = "remove-docx-watermark"
+        } else if lower.hasSuffix(".pptx") || lower.hasSuffix(".ppt") {
+            endpoint = "remove-pptx-watermark"
         } else {
-            Toast.shared.show(session.isLogin ? "处理失败，请稍后重试" : "登录已过期，请重新登录")
+            throw APIError.server(status: 400, message: "不支持的文档格式")
         }
+
+        let data = try Data(contentsOf: file.url)
+        let url = try await APIClient.shared.removeDocument(
+            endpoint: endpoint,
+            fileData: data,
+            filename: file.name,
+            prompt: prompt.isEmpty ? nil : prompt
+        )
+        results = [ResultFile(url: url, filename: file.name, kind: .document)]
     }
 
     // MARK: - 保存 / 分享
-    private func save(_ result: ResultFile) async {
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            let local = try await MediaSaver.download(result.url, fallbackExtension: result.isVideo ? ".mp4" : ".png")
-            if result.isImage || result.isVideo {
+
+    @MainActor
+    private func saveAllImages() async {
+        guard !results.isEmpty else { return }
+        ACDebugLog.log("saveAllImages start count=\(results.count)")
+        LoadingCenter.shared.show("保存中...")
+        var failures = 0
+        var permissionMessage: String?
+
+        for result in results {
+            do {
+                let local: URL
+                if result.url.isFileURL {
+                    local = result.url
+                } else {
+                    local = try await MediaSaver.download(result.url, fallbackExtension: ".jpg")
+                }
                 try await MediaSaver.saveToAlbum(local, isVideo: result.isVideo)
-                Toast.shared.show("已保存到相册")
-            } else {
-                shareItems = [local]
-                showShare = true
+            } catch {
+                failures += 1
+                #if DEBUG
+                print("[saveAllImages] failed result=\(result.url) error=\(error)")
+                #endif
+                if let message = (error as NSError).userInfo[NSLocalizedDescriptionKey] as? String,
+                   message.contains("权限") {
+                    permissionMessage = message
+                }
             }
-        } catch {
-            Toast.shared.show(error.localizedDescription)
+        }
+
+        ACDebugLog.log("saveAllImages end failures=\(failures) permission=\(permissionMessage ?? "nil")")
+        LoadingCenter.shared.hide()
+        if failures == 0 {
+            Toast.shared.success("已全部保存到相册")
+        } else if let permissionMessage {
+            Toast.shared.show(permissionMessage, duration: 3)
+        } else {
+            Toast.shared.show("部分或全部保存失败")
         }
     }
 
-    private func shareResult(_ result: ResultFile) async {
-        isSaving = true
-        defer { isSaving = false }
+    @MainActor
+    private func openDocument() async {
+        guard let result = results.first else { return }
+        LoadingCenter.shared.show("正在打开...")
         do {
-            let local = try await MediaSaver.download(result.url, fallbackExtension: result.isVideo ? ".mp4" : ".png")
+            let suggested = MediaSaver.documentFileName(original: document?.name ?? result.filename)
+            let local = try await MediaSaver.download(result.url, suggestedName: suggested)
+            LoadingCenter.shared.hide()
             shareItems = [local]
             showShare = true
         } catch {
-            Toast.shared.show("文件下载失败，无法分享")
-        }
-    }
-}
-
-/// 视频导入（把相册里的视频拷到沙盒再处理）
-struct MovieFile: Transferable {
-    let url: URL
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(contentType: .movie) { movie in
-            SentTransferredFile(movie.url)
-        } importing: { received in
-            let ext = received.file.pathExtension.isEmpty ? "mov" : received.file.pathExtension
-            let copy = URL.temporaryDirectory.appending(path: "video_\(UUID().uuidString).\(ext)")
-            try? FileManager.default.removeItem(at: copy)
-            try FileManager.default.copyItem(at: received.file, to: copy)
-            return Self(url: copy)
+            LoadingCenter.shared.hide()
+            Toast.shared.show("下载失败")
         }
     }
 }

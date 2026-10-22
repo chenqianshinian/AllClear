@@ -1,0 +1,155 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "zh_CN",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "A1C7B2F0",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "4.90",
+      "familyShareable" : false,
+      "internalID" : "4A6E1B70",
+      "localizations" : [
+        {
+          "description" : "包含 10 次处理额度",
+          "displayName" : "急救包",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "Includes 10 removal credits",
+          "displayName" : "Starter Pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.wuyong.allclear.pack_10",
+      "referenceName" : "急救包",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.90",
+      "familyShareable" : false,
+      "internalID" : "6B8C2D40",
+      "localizations" : [
+        {
+          "description" : "30天内包含 200 次额度",
+          "displayName" : "月卡会员",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "200 credits for 30 days",
+          "displayName" : "Monthly Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.wuyong.allclear.pro_monthly",
+      "referenceName" : "月卡会员",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "99.00",
+      "familyShareable" : false,
+      "internalID" : "9D0E4F60",
+      "localizations" : [
+        {
+          "description" : "365天内包含 3000 次额度",
+          "displayName" : "专业会员",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "3000 credits for 365 days",
+          "displayName" : "Yearly Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.wuyong.allclear.pro_yearly",
+      "referenceName" : "专业会员",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "zh_CN",
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+      {
+        "current" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : {
+          "index" : 1,
+          "type" : "purchase"
+        },
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : {
+          "index" : 0,
+          "type" : "verification"
+        },
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : {
+          "index" : 3,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : {
+          "index" : 4,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 新手教程（对应鸿蒙版 TutorialDialog，五步引导）
+/// 新手教程（iOS 额外入口；居中卡片弹窗，五步引导）
 struct TutorialView: View {
     var onClose: () -> Void
     @State private var step = 0
@@ -16,28 +16,28 @@ struct TutorialView: View {
     var body: some View {
         VStack(spacing: 0) {
             Text("快速上手指南")
-                .font(.system(size: 20, weight: .bold))
-                .padding(.top, 24)
-                .padding(.bottom, 20)
+                .font(.system(size: 18, weight: .bold))
+                .padding(.top, 18)
+                .padding(.bottom, 10)
 
             TabView(selection: $step) {
                 ForEach(0..<steps.count, id: \.self) { index in
                     VStack {
                         Text("\(index + 1)")
-                            .font(.system(size: 48, weight: .heavy))
+                            .font(.system(size: 40, weight: .heavy))
                             .foregroundStyle(ACColor.tabActiveBG)
-                            .padding(.bottom, 16)
+                            .padding(.bottom, 10)
 
                         Text(steps[index].title)
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(ACColor.title)
-                            .padding(.bottom, 12)
+                            .padding(.bottom, 8)
 
                         Text(steps[index].desc)
                             .font(.system(size: 14))
                             .foregroundStyle(ACColor.body)
                             .multilineTextAlignment(.center)
-                            .lineSpacing(6)
+                            .lineSpacing(4)
                             .padding(.horizontal, 24)
 
                         if index == 2 {
@@ -53,10 +53,10 @@ struct TutorialView: View {
                                     .foregroundStyle(ACColor.body)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
+                            .padding(10)
                             .background(ACColor.cardBG)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .padding(.top, 16)
+                            .padding(.top, 10)
                             .padding(.horizontal, 24)
                         }
                     }
@@ -65,7 +65,7 @@ struct TutorialView: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(height: 380)
+            .frame(height: 250)
 
             HStack {
                 if step > 0 {
@@ -94,11 +94,12 @@ struct TutorialView: View {
                         .tint(ACColor.tabActive)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 18)
         }
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
         .padding(.horizontal, 20)
     }
 }

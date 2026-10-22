@@ -1,18 +1,21 @@
 import Foundation
 
-/// 全局登录态与用户信息（对应鸿蒙版 LoginManager）。
+/// 全局登录态与用户信息（对应鸿蒙端 LoginManager / Taro.getStorageSync('token')）。
 @MainActor
 final class Session: ObservableObject {
     static let shared = Session()
 
     @Published private(set) var user: UserInfo?
     @Published private(set) var isLogin = false
+    /// 后端审核模式开关（/system/config in_review），与鸿蒙端一致
+    @Published var inReview = false
 
     private let tokenKey = "auth_token"
     private let userKey = "user_info"
 
     private init() {
-        if let token = UserDefaults.standard.string(forKey: tokenKey), !token.isEmpty {
+        let token = UserDefaults.standard.string(forKey: tokenKey)
+        if let token, !token.isEmpty {
             APIClient.shared.authToken = token
             isLogin = true
             if let data = UserDefaults.standard.data(forKey: userKey),
@@ -22,27 +25,44 @@ final class Session: ObservableObject {
         }
     }
 
-    // MARK: - 派生状态（对应鸿蒙版 getMaxSelectNumber / 体积限制）
+    // MARK: - 派生状态（与鸿蒙端一致）
     var points: Int { user?.points ?? 0 }
     var isVip: Bool { user?.isVip ?? false }
-    var maxSelectCount: Int { isVip ? 20 : 3 }
-    var maxImageMB: Double { isVip ? 20 : 5 }
-    var maxDocumentMB: Double { 30 }
+    var isPro: Bool { user?.isPro ?? false }
+    var maxSelectCount: Int { 9 }
+    var maxImageMB: Double { 20 }
+    var maxDocumentMB: Double { 50 }
+    var maxVideoMB: Double { 100 }
 
     // MARK: - 动作
     func login(email: String, password: String) async throws {
         try await APIClient.shared.login(username: email, password: password)
         isLogin = true
+        if user == nil {
+            user = UserInfo(email: email)
+        }
         await refreshUserInfo()
+    }
+
+    func register(email: String, password: String) async throws {
+        try await APIClient.shared.register(email: email, password: password)
     }
 
     func refreshUserInfo() async {
         guard isLogin else { return }
         do {
             let me = try await APIClient.shared.usersMe()
+            let email = me.email ?? user?.email ?? ""
+            let serverNickname = me.nickname ?? ""
+            let fallbackName: String = {
+                if !serverNickname.isEmpty { return serverNickname }
+                if let prefix = email.split(separator: "@").first, !prefix.isEmpty { return String(prefix) }
+                return "用户"
+            }()
             user = UserInfo(
                 id: me.id,
-                nickname: me.nickname ?? "用户",
+                email: email,
+                nickname: fallbackName,
                 avatarUrl: me.avatarUrl ?? "",
                 points: me.balance,
                 referralCode: me.referralCode ?? "",
@@ -52,14 +72,44 @@ final class Session: ObservableObject {
                 totalCheckins: me.totalCheckins ?? 0
             )
             persist()
+        } catch let error as APIError {
+            if error.isUnauthorized {
+                logout()
+            }
+            // 其它错误保留本地缓存，不打断用户操作
         } catch {
-            // 刷新失败时保留本地缓存，不打断用户操作
+            // 网络错误保留本地缓存
+        }
+    }
+
+    func refreshSystemConfig() async {
+        do {
+            let config = try await APIClient.shared.systemConfig()
+            inReview = config.inReview
+        } catch {
+            // 配置读取失败时保持默认值，不阻塞页面
         }
     }
 
     func updatePoints(_ points: Int) {
         user?.points = points
         persist()
+    }
+
+    func updateNickname(_ nickname: String) {
+        user?.nickname = nickname
+        persist()
+    }
+
+    func updateAvatar(_ url: String) {
+        user?.avatarUrl = url
+        persist()
+    }
+
+    func checkin() async throws -> CheckinResponse {
+        let result = try await APIClient.shared.checkin()
+        updatePoints(result.balance)
+        return result
     }
 
     func logout() {

@@ -1,4 +1,4 @@
-﻿package com.wuyong.allclear.data
+package com.wuyong.allclear.data
 
 import android.content.Context
 import okhttp3.FormBody
@@ -88,7 +88,15 @@ object ApiClient {
             if (access.isBlank()) throw ApiException("登录失败，请检查账号密码")
             saveToken(context, access)
         }
-        return me(context)
+        // 拿到 token 后立刻拉一次用户信息；失败必须回滚 token，
+        // 否则会留下「token 已落盘但登录态未建立」的脏状态，
+        // 下次冷启动 hasToken() 为 true，UI 会显示已登录但次数为 0。
+        return try {
+            me(context)
+        } catch (e: Exception) {
+            saveToken(context, null)
+            throw e
+        }
     }
 
     fun register(email: String, password: String) {

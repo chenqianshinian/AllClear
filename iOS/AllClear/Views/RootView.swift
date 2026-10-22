@@ -1,55 +1,119 @@
 import SwiftUI
 
-/// 应用根视图：启动页 → 主界面；并负责首启的隐私同意与新手教程
+/// 应用根视图：启动页 → 主界面；并负责首启的隐私同意
 struct RootView: View {
     @AppStorage("has_agreed_privacy") private var hasAgreedPrivacy = false
-    @AppStorage("has_shown_tutorial") private var hasShownTutorial = false
     @State private var showSplash = true
-    @State private var showTutorial = false
+    @ObservedObject private var app = AppState.shared
 
     var body: some View {
         ZStack {
             if showSplash {
                 SplashView { showSplash = false }
             } else {
-                MainTabView()
+                MainShell()
 
                 if !hasAgreedPrivacy {
                     PrivacyConsentView {
                         hasAgreedPrivacy = true
-                        if !hasShownTutorial {
-                            showTutorial = true
-                        }
-                    }
-                }
-
-                if showTutorial {
-                    Color.black.opacity(0.45).ignoresSafeArea()
-                    TutorialView {
-                        hasShownTutorial = true
-                        showTutorial = false
                     }
                 }
             }
+
+            LoadingOverlay()
+            ToastOverlay()
         }
         .task {
-            // 启动即刷新一次用户信息，保证次数/会员状态是最新的
+            applyDebugLaunchArgumentsIfNeeded()
             await Session.shared.refreshUserInfo()
+            await Session.shared.refreshSystemConfig()
         }
-        .toastOverlay()
     }
+
+    #if DEBUG
+    /// 仅用于本地模拟器验收：跳过首启、直达指定页面
+    private func applyDebugLaunchArgumentsIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-resetSession") {
+            Session.shared.logout()
+        }
+        if args.contains("-resetOnboarding") {
+            hasAgreedPrivacy = false
+        }
+        if args.contains("-skipOnboarding") {
+            hasAgreedPrivacy = true
+            showSplash = false
+        }
+        if let index = args.firstIndex(of: "-startTab"), index + 1 < args.count {
+            app.tab = args[index + 1] == "mine" ? .mine : .remove
+        }
+        if args.contains("-openRecharge") {
+            app.tab = .mine
+            app.minePath = [.recharge]
+        }
+        if args.contains("-openTutorial") {
+            app.tab = .mine
+        }
+        if let index = args.firstIndex(of: "-autoLogin"), index + 2 < args.count {
+            let email = args[index + 1]
+            let password = args[index + 2]
+            Task {
+                try? await Session.shared.login(email: email, password: password)
+            }
+        }
+    }
+    #else
+    private func applyDebugLaunchArgumentsIfNeeded() {}
+    #endif
 }
 
-/// 主界面：底部两个 Tab（去水印 / 我的）
-struct MainTabView: View {
-    var body: some View {
-        TabView {
-            RemoveWatermarkView()
-                .tabItem { Label("去水印", systemImage: "wand.and.stars") }
+/// 主界面：底部两个自定义 Tab（去水印 / 我的）
+struct MainShell: View {
+    @ObservedObject private var app = AppState.shared
 
-            MineView()
-                .tabItem { Label("我的", systemImage: "person.crop.circle") }
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                NavigationStack(path: $app.removePath) {
+                    RemoveWatermarkView()
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationDestination(for: AppRoute.self) { route in
+                            destination(for: route)
+                                .toolbar(.hidden, for: .navigationBar)
+                        }
+                }
+                .opacity(app.tab == .remove ? 1 : 0)
+                .allowsHitTesting(app.tab == .remove)
+                .zIndex(app.tab == .remove ? 1 : 0)
+
+                NavigationStack(path: $app.minePath) {
+                    MineView()
+                        .toolbar(.hidden, for: .navigationBar)
+                        .navigationDestination(for: AppRoute.self) { route in
+                            destination(for: route)
+                                .toolbar(.hidden, for: .navigationBar)
+                        }
+                }
+                .opacity(app.tab == .mine ? 1 : 0)
+                .allowsHitTesting(app.tab == .mine)
+                .zIndex(app.tab == .mine ? 1 : 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if app.isTabBarVisible {
+                CustomTabBar(selection: $app.tab)
+            }
         }
-        .tint(ACColor.tabActive)
+        .background(ACColor.gray100.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func destination(for route: AppRoute) -> some View {
+        switch route {
+        case .videoEdit(let input):
+            VideoEditView(input: input)
+        case .recharge:
+            RechargeView()
+        }
     }
 }

@@ -22,6 +22,8 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>扫码登录电脑版需要使用相机识别二维码</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要保存处理后的图片到相册</string>
 	<key>NSPhotoLibraryUsageDescription</key>
