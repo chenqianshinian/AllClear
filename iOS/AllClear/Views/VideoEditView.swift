@@ -284,6 +284,7 @@ struct VideoEditView: View {
         }
 
         status = .processing
+        AppState.shared.isBusy = true
         LoadingCenter.shared.show("视频AI处理中...")
         do {
             let url = try await APIClient.shared.removeVideo(
@@ -292,12 +293,14 @@ struct VideoEditView: View {
                 regions: regions
             )
             LoadingCenter.shared.hide()
+            AppState.shared.isBusy = false
             processedURL = url
             status = .success
             Toast.shared.success("处理成功")
             await session.refreshUserInfo()
         } catch {
             LoadingCenter.shared.hide()
+            AppState.shared.isBusy = false
             status = .idle
             let message = (error as? APIError)?.errorDescription ?? "网络异常，请稍后重试"
             Toast.shared.show(message, duration: (error as? APIError)?.isQuotaError == true ? 3 : 2)

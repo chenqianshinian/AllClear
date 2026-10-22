@@ -5,6 +5,7 @@ struct RootView: View {
     @AppStorage("has_agreed_privacy") private var hasAgreedPrivacy = false
     @State private var showSplash = true
     @ObservedObject private var app = AppState.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -27,6 +28,14 @@ struct RootView: View {
             applyDebugLaunchArgumentsIfNeeded()
             await Session.shared.refreshUserInfo()
             await Session.shared.refreshSystemConfig()
+        }
+        // 与鸿蒙端 useDidShow 一致：每次回到前台都刷新一次账号额度与审核开关
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await Session.shared.refreshUserInfo()
+                await Session.shared.refreshSystemConfig()
+            }
         }
     }
 

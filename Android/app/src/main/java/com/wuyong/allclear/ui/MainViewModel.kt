@@ -73,6 +73,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     var toast by mutableStateOf<ToastMsg?>(null)
 
+    /** 首页「AI 超强去水印」开关；放 VM 里，切 Tab 回来不会丢 */
+    var useAi by mutableStateOf(false)
+
+    /** 文档「水印文字」提示词；处理前与结果重试共用同一份 */
+    var docPrompt by mutableStateOf("")
+
     /** 审核模式：后端开启时隐藏充值入口 */
     var inReview by mutableStateOf(false)
         private set
@@ -102,6 +108,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         results.clear()
         progress = 0
         stageText = ""
+        // 与鸿蒙端一致：清空时一并重置提示词
+        docPrompt = ""
     }
 
     fun clearResult() {
@@ -233,6 +241,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 documents.add(item)
             }
+            // 与鸿蒙端一致：重新选文档时清空上一次的提示词
+            if (added.isNotEmpty()) docPrompt = ""
             clearResult()
         }
     }

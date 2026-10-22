@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.wuyong.allclear.data.ApiClient
 import com.wuyong.allclear.ui.AcColor
@@ -69,6 +70,13 @@ private fun AllClearApp() {
 
     LaunchedEffect(Unit) { vm.refreshUser() }
 
+    // 与鸿蒙端 useDidShow 一致：每次回到前台都刷新一次账号额度
+    LifecycleResumeEffect(Unit) {
+        vm.refreshUser()
+        vm.loadSystemConfig()
+        onPauseOrDispose { }
+    }
+
     if (!agreed) {
         PrivacyConsentDialog(
             onAgree = {
@@ -94,13 +102,17 @@ private fun AllClearApp() {
             NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                 NavigationBarItem(
                     selected = tab == Tab.REMOVE,
-                    onClick = { tab = Tab.REMOVE },
+                    onClick = {
+                        if (vm.isProcessing) vm.showToast("正在处理，请稍候…") else tab = Tab.REMOVE
+                    },
                     icon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null) },
                     label = { Text("去水印") }
                 )
                 NavigationBarItem(
                     selected = tab == Tab.MINE,
-                    onClick = { tab = Tab.MINE },
+                    onClick = {
+                        if (vm.isProcessing) vm.showToast("正在处理，请稍候…") else tab = Tab.MINE
+                    },
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
                     label = { Text("我的") }
                 )

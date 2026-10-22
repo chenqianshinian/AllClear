@@ -806,6 +806,7 @@ struct RemoveWatermarkView: View {
 
         status = .processing
         results = []
+        app.isBusy = true
         LoadingCenter.shared.show(files.count > 1 ? "处理中 0/\(files.count)" : "AI处理中...")
 
         do {
@@ -819,11 +820,13 @@ struct RemoveWatermarkView: View {
             }
             LoadingCenter.shared.hide()
             status = .success
+            app.isBusy = false
             Toast.shared.success("全部处理完成")
             await session.refreshUserInfo()
         } catch {
             LoadingCenter.shared.hide()
             status = .idle
+            app.isBusy = false
             let apiError = error as? APIError
             let message = apiError?.errorDescription ?? "网络异常或服务繁忙，请稍后再试"
             Toast.shared.show(message, duration: apiError?.isQuotaError == true ? 3.0 : 2.0)

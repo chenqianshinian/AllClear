@@ -18,6 +18,9 @@ final class AppState: ObservableObject {
     @Published var removePath: [AppRoute] = []
     @Published var minePath: [AppRoute] = []
 
+    /// 正在上传/处理时置 true：与鸿蒙端 showLoading(mask: true) 对齐，禁止切换 Tab
+    @Published var isBusy = false
+
     var isTabBarVisible: Bool {
         removePath.isEmpty && minePath.isEmpty
     }
@@ -61,6 +64,10 @@ struct CustomTabBar: View {
 
     private func tabItem(_ tab: AppState.Tab, icon: String, title: String) -> some View {
         Button {
+            if AppState.shared.isBusy {
+                Toast.shared.show("正在处理，请稍候…")
+                return
+            }
             selection = tab
         } label: {
             VStack(spacing: 4) {

@@ -59,8 +59,7 @@ fun HomeScreen(vm: MainViewModel) {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> -> if (uris.isNotEmpty()) vm.addDocuments(uris) }
 
-    var useAi by remember { mutableStateOf(false) }
-    var docPrompt by remember { mutableStateOf("") }
+    // useAi / docPrompt 放在 ViewModel 里，切 Tab 回来不会丢
 
     // 保存全部结果：Android 10+ 走 MediaStore 无需权限，Android 9 及以下需写存储权限
     val saveAll: () -> Unit = {
@@ -181,7 +180,7 @@ fun HomeScreen(vm: MainViewModel) {
                                 Text("启用 AI 超强去水印", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AcColor.Title)
                                 Text("每张消耗 5 次额度，效果更佳", fontSize = 11.sp, color = AcColor.Secondary)
                             }
-                            Switch(checked = useAi, onCheckedChange = { useAi = it })
+                            Switch(checked = vm.useAi, onCheckedChange = { vm.useAi = it })
                         }
                     }
                 } else {
@@ -202,8 +201,8 @@ fun HomeScreen(vm: MainViewModel) {
 
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = docPrompt,
-                        onValueChange = { docPrompt = it },
+                        value = vm.docPrompt,
+                        onValueChange = { vm.docPrompt = it },
                         label = { Text("水印文字（可选，用于强力擦除）") },
                         placeholder = { Text("例如：绝密资料") },
                         modifier = Modifier.fillMaxWidth(),
@@ -214,7 +213,7 @@ fun HomeScreen(vm: MainViewModel) {
                 Spacer(Modifier.height(16.dp))
 
                 Button(
-                    onClick = { vm.process(useAi = useAi, prompt = docPrompt.trim()) },
+                    onClick = { vm.process(useAi = vm.useAi, prompt = vm.docPrompt.trim()) },
                     enabled = !vm.isProcessing && vm.currentFiles().isNotEmpty(),
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(14.dp)
@@ -317,16 +316,16 @@ fun HomeScreen(vm: MainViewModel) {
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
-                            value = docPrompt,
-                            onValueChange = { docPrompt = it },
+                            value = vm.docPrompt,
+                            onValueChange = { vm.docPrompt = it },
                             placeholder = { Text("例如：绝密资料") },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(10.dp))
                         Button(
-                            onClick = { vm.process(prompt = docPrompt.trim()) },
-                            enabled = !vm.isProcessing && docPrompt.isNotBlank(),
+                            onClick = { vm.process(prompt = vm.docPrompt.trim()) },
+                            enabled = !vm.isProcessing && vm.docPrompt.isNotBlank(),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("重试")
