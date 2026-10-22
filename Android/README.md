@@ -28,13 +28,16 @@ app/src/main/java/com/wuyong/allclear/
 环境要求：JDK 17+、Android SDK Platform 36。
 
 ```bash
-# 首次：生成 Gradle Wrapper（本仓库未提交 wrapper）
-gradle wrapper --gradle-version 8.13
+cd Android
 
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug         # macOS / Linux
+gradlew.bat :app:assembleDebug       # Windows
 ```
 
-产物：`app/build/outputs/apk/debug/app-debug.apk`
+产物：`app/build/outputs/apk/debug/app-debug.apk`，用调试证书签名，**下载即可安装**。
+
+> 没装 Android Studio 的话，需要先设置环境变量 `ANDROID_HOME`（或写一个 `local.properties` 指向 SDK 目录），
+> 否则 Gradle 会报 `SDK location not found`。装了 Android Studio 的直接用它打开本目录，会自动生成 `local.properties`。
 
 ### 切换后端地址
 

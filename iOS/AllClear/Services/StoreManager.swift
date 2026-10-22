@@ -31,7 +31,7 @@ final class StoreManager: ObservableObject {
 
         var errorDescription: String? {
             switch self {
-            case .notAvailable: return "支付暂未开通，敬请期待"
+            case .notAvailable: return "请使用网页版完成充值"
             case .cancelled: return "已取消支付"
             case .pending: return "支付待确认，完成后会自动发放"
             case .verifyFailed(let msg): return msg
@@ -80,7 +80,7 @@ final class StoreManager: ObservableObject {
                 )
             } catch let error as APIError {
                 if error.statusCode == 404 {
-                    throw StoreError.verifyFailed("支付已完成，但服务器暂未开通 App Store 发货接口，请联系客服并提供订单号")
+                    throw StoreError.verifyFailed("支付已完成，但服务器发货接口未就绪，请携带订单号联系客服补发")
                 }
                 throw StoreError.verifyFailed(error.errorDescription ?? "发货失败，请联系客服")
             }

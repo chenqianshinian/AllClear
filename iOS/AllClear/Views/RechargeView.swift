@@ -3,6 +3,7 @@ import SwiftUI
 /// 充值中心（逐项对齐鸿蒙端 pages/recharge/index.tsx）
 struct RechargeView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @ObservedObject private var session = Session.shared
     @ObservedObject private var store = StoreManager.shared
 
@@ -67,11 +68,14 @@ struct RechargeView: View {
             CustomerServiceSheet()
                 .presentationDetents([.height(380)])
         }
-        .alert("支付暂未开通", isPresented: $showStoreUnavailable) {
+        .alert("请使用网页版完成充值", isPresented: $showStoreUnavailable) {
+            Button("打开网页版充值") {
+                if let url = URL(string: "https://allclearwatermark.com") { openURL(url) }
+            }
             Button("联系客服") { showContact = true }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("当前环境未加载 App Store 商品。请在 Xcode Scheme 中启用 AllClear.storekit，或联系客服获取额度。")
+            Text("从源码编译的构建不会自动带上 App Store 商品（需要 App Store Connect 商品与后端验签接口）。你可以直接在浏览器打开官网完成充值，额度会同步到同一账号。")
         }
     }
 

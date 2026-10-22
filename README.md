@@ -53,7 +53,7 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 | 每日签到领次数 | ✅ | ✅ |
 | 头像与昵称修改 | — | ✅ |
 | 扫码登录网页版 | — | ✅ |
-| 充值 | ✅ 支付宝 / 微信扫码 | 🚧 StoreKit 2 内购（本地 .storekit 可测，线上待后端验签接口）|
+| 充值 | ✅ 支付宝 / 微信扫码 | ✅ 一键跳转网页版充值（App 内 StoreKit 需自行配置 App Store 商品）|
 | 首启隐私强确认、用户协议、隐私政策 | ✅ | ✅ |
 | 新手教程、联系客服、邀请好友 | ✅ | ✅ |
 | 账号注销 | ✅ | 🚧 |
@@ -81,15 +81,17 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 
 ### Android
 
-环境：JDK 17+、Android SDK Platform 36。
+环境：JDK 17+、Android SDK Platform 36。**仓库已内置 Gradle Wrapper，clone 下来直接就能编。**
 
 ```bash
 cd Android
-gradle wrapper --gradle-version 8.13   # 首次运行，生成本地 Wrapper
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug        # macOS / Linux
+gradlew.bat :app:assembleDebug      # Windows
 ```
 
-产物：`Android/app/build/outputs/apk/debug/app-debug.apk`
+产物：`Android/app/build/outputs/apk/debug/app-debug.apk`，**可直接安装到手机**（调试签名）。
+
+也可以直接下载 Release 里的安装包，或点官网右上角「客户端下载」。
 
 切换后端地址：
 

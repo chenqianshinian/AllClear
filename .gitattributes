@@ -13,3 +13,8 @@
 *.png     binary
 *.jpg     binary
 *.jpeg    binary
+
+# Gradle Wrapper：脚本 LF（macOS/Linux 直接可执行），批处理 CRLF，jar 二进制
+gradlew        text eol=lf
+gradlew.bat    text eol=crlf
+*.jar          binary

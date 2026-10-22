@@ -1,0 +1,53 @@
+name: Release
+
+# 打 tag（v1.0.0）或手动触发时，产出一个可直接安装的 Android 安装包并挂到 Release 上，
+# 网页端「下载 Android 版」按钮可以直接指向 Releases 里的 allclear.apk。
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # debug 包用调试证书签名，用户下载即可安装；上架商店时请换成自己的 release 签名
+      - name: Build APK
+        working-directory: Android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Rename artifact
+        run: |
+          mkdir -p dist
+          cp Android/app/build/outputs/apk/debug/app-debug.apk dist/allclear.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: allclear-apk
+          path: dist/allclear.apk
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/allclear.apk
+          name: AllClear ${{ github.ref_name }}
+          body: |
+            AllClear · 水印天敌 客户端构建产物
+
+            - `allclear.apk` —— Android 版，下载后直接安装（调试签名）
+            - iOS 版请克隆仓库后用 Xcode 打开 `iOS/AllClear.xcodeproj` 编译

@@ -288,10 +288,6 @@ struct MineView: View {
                 shareInvite()
             }
 
-            ACMenuRow(icon: "🎁", title: "看广告领次数") {
-                Toast.shared.show("开发中")
-            }
-
             ACMenuRow(icon: "📞", title: "联系客服", showDivider: false) {
                 copyCustomerService()
             }

@@ -51,8 +51,8 @@ xcrun simctl launch booted com.wuyong.allclear
 | --- | --- | --- |
 | `pages/index/index.tsx` 去水印 | `Views/RemoveWatermarkView.swift` | 蓝色圆角头图、白色浮层卡片、图片/视频与 PDF/文档切换、虚线预览区、9 图上限、图片删除/预览、AI 开关、扣费确认、批量进度、文档文字重试、结果网格、保存全部、清空 |
 | `pages/video-edit/index.tsx` 视频框选 | `Views/VideoEditView.swift` | 视频循环预览、手指拖拽框选、红框删除、撤销全部、确认去除、处理完成预览、重新框选、保存相册 |
-| `pages/profile/index.tsx` 我的 | `Views/MineView.swift` | 蓝色背景 + 浮层用户卡、头像/昵称修改、PRO 标识、剩余次数、操作教程（iOS 额外入口，居中卡片弹窗）、扫码登录电脑版、充值中心/获取额度、邀请好友、看广告（开发中）、联系客服、退出登录、邮箱登录/注册弹窗 |
-| `pages/recharge/index.tsx` 充值中心 | `Views/RechargeView.swift` | 审核模式维护页、三档套餐、选中高亮、底部支付按钮；iOS 使用 StoreKit |
+| `pages/profile/index.tsx` 我的 | `Views/MineView.swift` | 蓝色背景 + 浮层用户卡、头像/昵称修改、PRO 标识、剩余次数、操作教程（iOS 额外入口，居中卡片弹窗）、扫码登录电脑版、充值中心/获取额度、邀请好友、联系客服、退出登录、邮箱登录/注册弹窗 |
+| `pages/recharge/index.tsx` 充值中心 | `Views/RechargeView.swift` | 审核模式维护页、三档套餐、选中高亮、底部支付按钮；App 内走 StoreKit，商品不可用时一键跳转网页版充值 |
 | `app.config.ts` tabBar | `Views/RootView.swift` + `Components.swift` | 自定义底部 TabBar（去水印 / 我的），白底、顶部细线、蓝色选中态 |
 | 隐私/协议 | `PrivacyConsentView.swift` / `LegalView.swift` | 保留 iOS 首启隐私同意与用户协议/隐私政策 |
 
