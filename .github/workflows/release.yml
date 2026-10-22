@@ -28,7 +28,6 @@ jobs:
       - name: Build APK
         working-directory: Android
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
-
       - name: Rename artifact
         run: |
           mkdir -p dist

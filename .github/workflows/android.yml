@@ -21,12 +21,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # 仓库暂未提交 gradle-wrapper，这里直接按版本拉一个 Gradle
-      # 如果你已经补上 ./gradlew，可以把这一步换成 ./gradlew 调用
+      # 走仓库自带的 Gradle Wrapper，和用户 clone 下来后的构建方式完全一致
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
 
       # 若 runner 自带的 Android SDK 缺少 API 36，取消下面两行注释
       # - uses: android-actions/setup-android@v3
@@ -34,7 +31,7 @@ jobs:
 
       - name: Assemble debug APK
         working-directory: Android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
