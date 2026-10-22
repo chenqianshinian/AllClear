@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
 import com.wuyong.allclear.data.MediaSaver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,6 +94,9 @@ fun VideoEditScreen(
     val aspect = if (videoSize.height > 0f) videoSize.width / videoSize.height else 16f / 9f
     val displayWidth = (configuration.screenWidthDp.dp - 40.dp).coerceAtLeast(200.dp)
     val displayHeight = displayWidth / aspect.coerceAtLeast(0.2f)
+
+    // 系统返回键：处理中不响应，避免中断上传
+    BackHandler(enabled = !vm.isProcessing) { onExit() }
 
     Column(
         modifier = Modifier
@@ -262,6 +266,10 @@ fun VideoEditScreen(
 
                 Button(
                     onClick = {
+                        if (videoSize.width <= 0f || videoSize.height <= 0f) {
+                            vm.showToast("视频信息读取失败，请返回重新选择")
+                            return@Button
+                        }
                         if (boxes.isEmpty()) {
                             vm.showToast("请先在视频画面上框出至少一个水印区域")
                             return@Button
