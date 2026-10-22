@@ -31,6 +31,23 @@ xcrun simctl launch booted com.wuyong.allclear
 
 也可以直接双击 `AllClear.xcodeproj`，选择 `AllClear` Scheme 与 iPhone 模拟器后 Run。
 
+## 装到自己手机上（真机）
+
+模拟器不需要任何账号，但装到真机必须自己完成签名，**每个开发者都要做一遍**：
+
+1. **选 Team**：Xcode 里选中 `AllClear` target → Signing & Capabilities → Team 选你自己的 Apple ID
+2. **改 Bundle Identifier**：`com.wuyong.allclear` 是原作者已注册的 App ID，你必须换成自己的，
+   例如 `com.yourname.allclear`（改 `project.yml` 或直接在 Xcode 里改）
+3. 想固化配置的话，在 `project.yml` 的 target settings 里加 `DEVELOPMENT_TEAM: 你的TeamID`，
+   这样每次 `xcodegen generate` 之后不用再手选
+
+需要注意：
+
+- 免费 Apple ID 也能真机调试，但签名 **7 天过期**，且最多同时装 3 个自签名 App
+- 上架 App Store 需要付费开发者账号（$99/年）
+- **App 内购不可用**：从源码编译的构建里没有 App Store Connect 商品，
+  充值页会引导到网页版完成充值，不影响去水印主流程
+
 ### StoreKit（充值页）
 
 `AllClear.storekit` 已加入 Scheme 的 Run → Options → StoreKit Configuration。

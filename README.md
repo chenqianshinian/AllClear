@@ -38,6 +38,14 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 
 <p align="center"><sub>iOS 版实机截图（Android 版界面语言一致）</sub></p>
 
+## 立即体验
+
+| 方式 | 地址 | 说明 |
+| --- | --- | --- |
+| 在线使用 | <https://allclearwatermark.com> | 与客户端共用同一套后端和账号，网页能做的客户端都能做 |
+| 下载 Android | [Releases 里的 `allclear.apk`](../../releases/latest) | 调试签名，下载即可安装 |
+| 自己编译 | 见下方「快速开始」 | 两个平台都是完整源码，编译完就能跑 |
+
 ## 功能对照
 
 | 功能 | Android | iOS |
