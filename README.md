@@ -27,16 +27,44 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 
 **在线体验（国内可直接访问）：<https://allclearwatermark.com>**
 
-## 截图
+## 效果对比
+
+**图片** —— 满屏平铺水印，一次去除，不留痕迹。
 
 <p align="center">
-  <img src="docs/screenshots/ios-home.png" width="220" alt="首页">
-  <img src="docs/screenshots/ios-result.png" width="220" alt="处理结果">
-  <img src="docs/screenshots/ios-video.png" width="220" alt="视频框选">
-  <img src="docs/screenshots/ios-recharge.png" width="220" alt="充值中心">
+  <img src="docs/screenshots/before-image.jpg" width="380" alt="去水印前">
+  <img src="docs/screenshots/after-image.jpg" width="380" alt="去水印后">
+</p>
+
+<p align="center"><sub>左：原图（满屏「小金毛」水印）　·　右：处理结果</sub></p>
+
+**文档** —— PDF 与 Word 的正文、印章、页眉页脚水印都能清干净，排版不动。
+
+<p align="center">
+  <img src="docs/screenshots/compare-document.jpg" width="880" alt="PDF / Word 去水印前后对比">
+</p>
+
+<p align="center"><sub>上半部分：PDF 前后对比（含倾斜水印与扫描件）　·　右半部分：Word 前后对比</sub></p>
+
+## 界面
+
+<p align="center">
+  <img src="docs/screenshots/ios-home.png" width="190" alt="首页">
+  <img src="docs/screenshots/ios-result.png" width="190" alt="处理结果">
+  <img src="docs/screenshots/ios-video.png" width="190" alt="视频框选">
+  <img src="docs/screenshots/ios-recharge.png" width="190" alt="充值中心">
+  <img src="docs/screenshots/splash.jpg" width="190" alt="启动页">
 </p>
 
 <p align="center"><sub>iOS 版实机截图（Android 版界面语言一致）</sub></p>
+
+## 已上架
+
+<p align="center">
+  <img src="docs/screenshots/appgallery.jpg" width="300" alt="华为应用市场">
+</p>
+
+<p align="center"><sub>华为应用市场（AppGallery）已上架，用户评分 5.0</sub></p>
 
 ## 立即体验
 
