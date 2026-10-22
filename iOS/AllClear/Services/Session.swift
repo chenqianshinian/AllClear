@@ -25,14 +25,16 @@ final class Session: ObservableObject {
         }
     }
 
-    // MARK: - 派生状态（与鸿蒙端一致）
+    // MARK: - 派生状态（与官网/鸿蒙端 H5 的额度规则保持一致）
+    // 免费：单次 3 个 / 图片 5MB / 视频 10MB / 文档 10MB
+    // 会员：单次 20 个 / 图片 20MB / 视频 50MB / 文档 50MB
     var points: Int { user?.points ?? 0 }
     var isVip: Bool { user?.isVip ?? false }
     var isPro: Bool { user?.isPro ?? false }
-    var maxSelectCount: Int { 9 }
-    var maxImageMB: Double { 20 }
-    var maxDocumentMB: Double { 50 }
-    var maxVideoMB: Double { 100 }
+    var maxSelectCount: Int { isVip ? 20 : 3 }
+    var maxImageMB: Double { isVip ? 20 : 5 }
+    var maxVideoMB: Double { isVip ? 50 : 10 }
+    var maxDocumentMB: Double { isVip ? 50 : 10 }
 
     // MARK: - 动作
     func login(email: String, password: String) async throws {

@@ -242,7 +242,7 @@ struct RemoveWatermarkView: View {
             } else if !images.isEmpty {
                 imageGrid
             } else {
-                Text(activeTab == .media ? "请在下方选择图片或视频" : "请从文件选择文档")
+                Text(emptyHintText)
                     .font(.system(size: 14))
                     .foregroundStyle(ACColor.gray400)
                     .multilineTextAlignment(.center)
@@ -600,6 +600,18 @@ struct RemoveWatermarkView: View {
     // MARK: - 派生状态
 
     private var hasFiles: Bool { !images.isEmpty || document != nil }
+
+    /// 空态提示：把当前账号的额度限制直接写出来，与官网 / 鸿蒙端 H5 文案一致
+    private var emptyHintText: String {
+        let count = session.maxSelectCount
+        if activeTab == .media {
+            let imageMB = Int(session.maxImageMB)
+            let videoMB = Int(session.maxVideoMB)
+            return "请在下方选择图片或视频\n最多 \(count) 个，图片 ≤ \(imageMB)MB，视频 ≤ \(videoMB)MB"
+        }
+        let documentMB = Int(session.maxDocumentMB)
+        return "请从文件选择文档\n最多 \(count) 个，单个 ≤ \(documentMB)MB"
+    }
 
     private var activeKind: PickedKind? {
         if !images.isEmpty { return .image }

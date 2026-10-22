@@ -383,7 +383,11 @@ private fun SelectionBox(vm: MainViewModel) {
     ) {
         if (files.isEmpty()) {
             EmptyHint(
-                text = if (vm.mode == 0) "请在下方选择图片或视频\n支持批量选择处理" else "请在下方选择 PDF / Word / PPT\n单个文件最大 30MB",
+                text = if (vm.mode == 0) {
+                    "请在下方选择图片或视频\n最多 ${vm.maxSelectCount} 个，图片 ≤ ${vm.maxImageMb.toInt()}MB，视频 ≤ ${vm.maxVideoMb.toInt()}MB"
+                } else {
+                    "请在下方选择 PDF / Word / PPT\n最多 ${vm.maxSelectCount} 个，单个 ≤ ${vm.maxDocumentMb.toInt()}MB"
+                },
                 modifier = Modifier.fillMaxSize()
             )
         } else {

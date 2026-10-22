@@ -79,9 +79,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val points: Int get() = user?.points ?: 0
     val isVip: Boolean get() = user?.isVip == true
+    // 与官网 / 鸿蒙端 H5 的额度规则一致：
+    // 免费 3 个 / 图 5MB / 视频 10MB / 文档 10MB；会员 20 个 / 20MB / 50MB / 50MB
     val maxSelectCount: Int get() = if (isVip) 20 else 3
     val maxImageMb: Double get() = if (isVip) 20.0 else 5.0
-    val maxDocumentMb: Double = 30.0
+    val maxVideoMb: Double get() = if (isVip) 50.0 else 10.0
+    val maxDocumentMb: Double get() = if (isVip) 50.0 else 10.0
 
     fun switchMode(target: Int) {
         if (mode == target) return
@@ -149,7 +152,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 showToast("读取视频失败，请重试")
                 return@launch
             }
-            val limit = if (isVip) 50.0 else 10.0
+            val limit = maxVideoMb
             if (item.sizeMb > limit) {
                 item.file.delete()
                 showToast("视频超过 ${limit.toInt()}MB 限制，请重新选择")
@@ -225,7 +228,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (item.sizeMb > maxDocumentMb) {
                     item.file.delete()
-                    showToast("包含超过 30MB 的文档，请重新选择")
+                    showToast("包含超过 ${maxDocumentMb.toInt()}MB 的文档，请重新选择")
                     continue
                 }
                 documents.add(item)
