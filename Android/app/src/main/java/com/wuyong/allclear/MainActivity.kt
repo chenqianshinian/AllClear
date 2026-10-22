@@ -1,0 +1,115 @@
+package com.wuyong.allclear
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.wuyong.allclear.data.ApiClient
+import com.wuyong.allclear.ui.AcColor
+import com.wuyong.allclear.ui.HomeScreen
+import com.wuyong.allclear.ui.MainViewModel
+import com.wuyong.allclear.ui.MineScreen
+import com.wuyong.allclear.ui.PrivacyConsentDialog
+import com.wuyong.allclear.ui.ToastHost
+
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ApiClient.init(applicationContext)
+        enableEdgeToEdge()
+        setContent {
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = AcColor.Primary,
+                    secondary = AcColor.TabActive,
+                    background = Color.White,
+                    surface = Color.White
+                )
+            ) {
+                AllClearApp()
+            }
+        }
+    }
+}
+
+private enum class Tab { REMOVE, MINE }
+
+@Composable
+private fun AllClearApp() {
+    val vm: MainViewModel = viewModel()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var tab by remember { mutableStateOf(Tab.REMOVE) }
+    var agreed by remember { mutableStateOf(vm.hasAgreedPrivacy()) }
+
+    LaunchedEffect(Unit) { vm.refreshUser() }
+
+    if (!agreed) {
+        PrivacyConsentDialog(
+            onAgree = {
+                vm.setAgreedPrivacy()
+                agreed = true
+            },
+            onExit = { (context as? android.app.Activity)?.finish() }
+        )
+        return
+    }
+
+    Scaffold(
+        containerColor = AcColor.PageBg,
+        bottomBar = {
+            NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
+                NavigationBarItem(
+                    selected = tab == Tab.REMOVE,
+                    onClick = { tab = Tab.REMOVE },
+                    icon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null) },
+                    label = { Text("去水印") }
+                )
+                NavigationBarItem(
+                    selected = tab == Tab.MINE,
+                    onClick = { tab = Tab.MINE },
+                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    label = { Text("我的") }
+                )
+            }
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(AcColor.PageBg)
+        ) {
+            when (tab) {
+                Tab.REMOVE -> HomeScreen(vm)
+                Tab.MINE -> MineScreen(vm, onNavigateRemove = { tab = Tab.REMOVE })
+            }
+        }
+    }
+
+    ToastHost(vm)
+}

@@ -1,0 +1,35 @@
+# ---- 操作系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+*.iml
+
+# ---- 签名与密钥：绝不提交 ----
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+keystore.properties
+signing.properties
+secrets.properties
+
+# ---- 构建产物 ----
+**/build/
+**/DerivedData/
+**/.gradle/
+**/.kotlin/
+**/local.properties
+**/*.xcodeproj/xcuserdata/
+*.apk
+*.aab
+*.ipa
+output.json
+
+# ---- 媒体大文件 ----
+*.mp4
+*.mov
+*.psd

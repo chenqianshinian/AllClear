@@ -1,0 +1,15 @@
+# 统一换行符为 LF，避免 macOS / Linux 上脚本因 CRLF 报错
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.kt      text eol=lf
+*.kts     text eol=lf
+*.swift   text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.md      text eol=lf
+*.py      text eol=lf
+
+*.png     binary
+*.jpg     binary
+*.jpeg    binary

@@ -1,0 +1,40 @@
+name: AllClear
+options:
+  bundleIdPrefix: com.wuyong
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  AllClear:
+    type: application
+    platform: iOS
+    sources:
+      - path: AllClear
+    info:
+      path: AllClear/Info.plist
+      properties:
+        CFBundleDisplayName: AllClear-水印天敌
+        UILaunchScreen: {}
+        NSPhotoLibraryUsageDescription: 需要访问相册以选择图片进行去水印处理
+        NSPhotoLibraryAddUsageDescription: 需要保存处理后的图片到相册
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.wuyong.allclear
+        GENERATE_INFOPLIST_FILE: false
+        TARGETED_DEVICE_FAMILY: "1"
+schemes:
+  AllClear:
+    build:
+      targets:
+        AllClear: all
+    run:
+      config: Debug
+    archive:
+      config: Release

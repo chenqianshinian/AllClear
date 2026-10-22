@@ -1,0 +1,44 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'Android/**', '.github/workflows/android.yml' ]
+  pull_request:
+    paths: [ 'Android/**' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 仓库暂未提交 gradle-wrapper，这里直接按版本拉一个 Gradle
+      # 如果你已经补上 ./gradlew，可以把这一步换成 ./gradlew 调用
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      # 若 runner 自带的 Android SDK 缺少 API 36，取消下面两行注释
+      # - uses: android-actions/setup-android@v3
+      # - run: sdkmanager "platforms;android-36"
+
+      - name: Assemble debug APK
+        working-directory: Android
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: Android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

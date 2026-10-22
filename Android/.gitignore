@@ -1,0 +1,32 @@
+# ---- 构建产物 ----
+.gradle/
+build/
+.kotlin/
+.externalNativeBuild/
+.cxx/
+captures/
+*.apk
+*.aab
+output.json
+app/release/
+
+# ---- 本地环境（每台机器不同，不能提交）----
+local.properties
+*.iml
+.idea/
+.vscode/
+
+# ---- 签名与密钥：绝不提交 ----
+*.jks
+*.keystore
+*.p12
+keystore.properties
+signing.properties
+secrets.properties
+
+# ---- 操作系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
