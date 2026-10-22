@@ -49,11 +49,8 @@ AllClear（水印天敌）是一个多端去水印工具：选择图片、视频
 ## 界面
 
 <p align="center">
-  <img src="docs/screenshots/ios-home.png" width="190" alt="首页">
-  <img src="docs/screenshots/ios-result.png" width="190" alt="处理结果">
-  <img src="docs/screenshots/ios-video.png" width="190" alt="视频框选">
-  <img src="docs/screenshots/ios-recharge.png" width="190" alt="充值中心">
-  <img src="docs/screenshots/splash.jpg" width="190" alt="启动页">
+  <img src="docs/screenshots/ios-home.png" width="230" alt="首页">
+  <img src="docs/screenshots/splash.jpg" width="230" alt="启动页">
 </p>
 
 <p align="center"><sub>iOS 版实机截图（Android 版界面语言一致）</sub></p>
